@@ -1,25 +1,22 @@
 package com.example.harudam.ui.screens
 
-import android.util.Patterns
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.harudam.AuthRepository
+import com.example.harudam.viewmodel.SignUpUiState
 
 private val AuthBlue = Color(0xFF4968C8)
 private val AuthText = Color(0xFF34445E)
@@ -29,25 +26,19 @@ private val AuthBackground = Color(0xFFF3F1FA)
 
 @Composable
 fun SignUpScreen(
+    uiState: SignUpUiState,
+    onEmailChange: (String) -> Unit,
+    onPasswordChange: (String) -> Unit,
+    onAgreementChange: (Boolean) -> Unit,
     onSignUpClick: () -> Unit = {},
     onGoogleSignUpClick: () -> Unit = {},
     onLoginClick: () -> Unit = {},
     onBackClick: () -> Unit = {},
+    isLoading: Boolean = false,
+    message: String? = null,
 ) {
-    val repository = remember { AuthRepository() }
-
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var agreedToPersonalData by remember { mutableStateOf(false) }
-
-    var emailError by remember { mutableStateOf<String?>(null) }
-    var passwordError by remember { mutableStateOf<String?>(null) }
-    var agreementError by remember { mutableStateOf(false) }
-    var serverError by remember { mutableStateOf<String?>(null) }
-    var loading by remember { mutableStateOf(false) }
-
     BackHandler {
-        if (!loading) {
+        if (!isLoading) {
             onBackClick()
         }
     }
@@ -76,22 +67,15 @@ fun SignUpScreen(
                 )
             ) {
                 Column(
-                    modifier = Modifier.padding(
-                        horizontal = 22.dp,
-                        vertical = 22.dp
-                    ),
+                    modifier = Modifier.padding(22.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     TextButton(
                         onClick = onBackClick,
-                        enabled = !loading,
+                        enabled = !isLoading,
                         modifier = Modifier.align(Alignment.Start)
                     ) {
-                        Text(
-                            "‹  뒤로",
-                            color = AuthMuted,
-                            fontSize = 14.sp
-                        )
+                        Text("‹  뒤로", color = AuthMuted)
                     }
 
                     Text(
@@ -106,14 +90,10 @@ fun SignUpScreen(
                     AuthInputField(
                         label = "Email",
                         hint = "이메일 주소를 입력하세요",
-                        value = email,
-                        onValueChange = {
-                            email = it
-                            emailError = null
-                            serverError = null
-                        },
-                        enabled = !loading,
-                        errorMessage = emailError
+                        value = uiState.email,
+                        onValueChange = onEmailChange,
+                        enabled = !isLoading,
+                        errorMessage = uiState.emailError
                     )
 
                     Spacer(Modifier.height(12.dp))
@@ -121,15 +101,11 @@ fun SignUpScreen(
                     AuthInputField(
                         label = "Password",
                         hint = "비밀번호를 입력하세요",
-                        value = password,
-                        onValueChange = {
-                            password = it
-                            passwordError = null
-                            serverError = null
-                        },
-                        enabled = !loading,
+                        value = uiState.password,
+                        onValueChange = onPasswordChange,
+                        enabled = !isLoading,
                         password = true,
-                        errorMessage = passwordError
+                        errorMessage = uiState.passwordError
                     )
 
                     Spacer(Modifier.height(10.dp))
@@ -139,49 +115,42 @@ fun SignUpScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Checkbox(
-                            checked = agreedToPersonalData,
-                            enabled = !loading,
-                            onCheckedChange = {
-                                agreedToPersonalData = it
-                                agreementError = false
-                            },
+                            checked = uiState.agreedToPersonalData,
+                            onCheckedChange = onAgreementChange,
+                            enabled = !isLoading,
                             colors = CheckboxDefaults.colors(
                                 checkedColor = AuthBlue
                             )
                         )
 
                         Text(
-                            "개인정보 처리에 동의합니다",
+                            text = "개인정보 처리에 동의합니다",
                             color = AuthMuted,
                             fontSize = 12.sp
                         )
 
-                        // 기존 '보기' 버튼. 약관 화면 연결은 별도 작업.
+                        // 약관 내용 화면은 추후 연결
                         TextButton(
-                            enabled = !loading,
+                            enabled = !isLoading,
                             onClick = {}
                         ) {
-                            Text(
-                                "보기",
-                                color = AuthBlue,
-                                fontSize = 12.sp
-                            )
+                            Text("보기", color = AuthBlue)
                         }
                     }
 
-                    if (agreementError) {
+                    if (uiState.agreementError) {
                         Text(
-                            "개인정보 처리에 동의해 주세요.",
+                            text = "개인정보 처리에 동의해 주세요.",
                             color = MaterialTheme.colorScheme.error,
                             fontSize = 12.sp
                         )
                     }
 
-                    if (serverError != null) {
+                    if (!message.isNullOrBlank()) {
                         Spacer(Modifier.height(8.dp))
 
                         Text(
-                            text = serverError.orEmpty(),
+                            text = message,
                             color = MaterialTheme.colorScheme.error,
                             fontSize = 12.sp,
                             modifier = Modifier.fillMaxWidth()
@@ -191,71 +160,16 @@ fun SignUpScreen(
                     Spacer(Modifier.height(9.dp))
 
                     Button(
-                        enabled = !loading,
-                        onClick = {
-                            val inputEmail = email.trim()
-                            val inputPassword = password
-
-                            serverError = null
-
-                            emailError = when {
-                                inputEmail.isEmpty() ->
-                                    "이메일을 입력해 주세요."
-
-                                !Patterns.EMAIL_ADDRESS
-                                    .matcher(inputEmail).matches() ->
-                                    "올바른 이메일 형식이 아닙니다."
-
-                                else -> null
-                            }
-
-                            passwordError = when {
-                                inputPassword.isEmpty() ->
-                                    "비밀번호를 입력해 주세요."
-
-                                inputPassword.length < 6 ->
-                                    "비밀번호는 최소 6자 이상 입력해 주세요."
-
-                                else -> null
-                            }
-
-                            agreementError = !agreedToPersonalData
-
-                            if (
-                                emailError == null &&
-                                passwordError == null &&
-                                !agreementError
-                            ) {
-                                loading = true
-
-                                repository.signUp(
-                                    username = inputEmail
-                                        .substringBefore("@")
-                                        .take(30),
-                                    email = inputEmail,
-                                    password = inputPassword,
-                                    onSuccess = {
-                                        loading = false
-                                        password = ""
-                                        onSignUpClick()
-                                    },
-                                    onError = {
-                                        loading = false
-                                        serverError = it
-                                    }
-                                )
-                            }
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(54.dp),
+                        onClick = onSignUpClick,
+                        enabled = !isLoading,
+                        modifier = Modifier.fillMaxWidth().height(54.dp),
                         shape = RoundedCornerShape(13.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = AuthBlue
                         )
                     ) {
                         Text(
-                            text = if (loading) "가입 중…" else "회원가입",
+                            text = if (isLoading) "가입 중…" else "회원가입",
                             fontSize = 15.sp,
                             fontWeight = FontWeight.SemiBold
                         )
@@ -263,46 +177,44 @@ fun SignUpScreen(
 
                     Spacer(Modifier.height(22.dp))
 
-                    AuthSignUpDivider()
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            Modifier.weight(1f).height(1.dp)
+                                .background(AuthBorder)
+                        )
+
+                        Text(
+                            text = "또는",
+                            modifier = Modifier.padding(horizontal = 10.dp),
+                            color = AuthMuted,
+                            fontSize = 12.sp
+                        )
+
+                        Box(
+                            Modifier.weight(1f).height(1.dp)
+                                .background(AuthBorder)
+                        )
+                    }
 
                     Spacer(Modifier.height(14.dp))
 
                     OutlinedButton(
-                        enabled = !loading,
                         onClick = onGoogleSignUpClick,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(50.dp),
+                        enabled = !isLoading,
+                        modifier = Modifier.fillMaxWidth().height(50.dp),
                         shape = RoundedCornerShape(13.dp)
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(23.dp)
-                                    .background(
-                                        Color(0xFFF1F4FC),
-                                        CircleShape
-                                    ),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    "G",
-                                    color = Color(0xFF4285F4),
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 15.sp
-                                )
-                            }
+                        Text(
+                            "G",
+                            color = Color(0xFF4285F4),
+                            fontWeight = FontWeight.Bold
+                        )
 
-                            Spacer(Modifier.size(9.dp))
+                        Spacer(Modifier.width(12.dp))
 
-                            Text(
-                                "Google 계정으로 가입",
-                                color = AuthText,
-                                fontSize = 14.sp
-                            )
-                        }
+                        Text("Google 계정으로 가입", color = AuthText)
                     }
 
                     Spacer(Modifier.height(13.dp))
@@ -317,13 +229,12 @@ fun SignUpScreen(
                         )
 
                         TextButton(
-                            enabled = !loading,
-                            onClick = onLoginClick
+                            onClick = onLoginClick,
+                            enabled = !isLoading
                         ) {
                             Text(
                                 "로그인",
                                 color = AuthBlue,
-                                fontSize = 12.sp,
                                 fontWeight = FontWeight.SemiBold
                             )
                         }
@@ -349,9 +260,7 @@ private fun AuthInputField(
         onValueChange = onValueChange,
         enabled = enabled,
         modifier = Modifier.fillMaxWidth(),
-        label = {
-            Text(label, fontSize = 12.sp)
-        },
+        label = { Text(label, fontSize = 12.sp) },
         placeholder = {
             Text(hint, color = AuthMuted, fontSize = 13.sp)
         },
@@ -381,39 +290,5 @@ private fun AuthInputField(
                 .fillMaxWidth()
                 .padding(start = 12.dp, top = 4.dp)
         )
-    }
-}
-
-@Composable
-private fun AuthSignUpDivider() {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            Modifier
-                .weight(1f)
-                .height(1.dp)
-                .background(AuthBorder)
-        )
-
-        Text(
-            "또는",
-            modifier = Modifier.padding(horizontal = 10.dp),
-            color = AuthMuted,
-            fontSize = 12.sp
-        )
-
-        Box(
-            Modifier
-                .weight(1f)
-                .height(1.dp)
-                .background(AuthBorder)
-        )
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-private fun SignUpScreenPreview() {
-    MaterialTheme {
-        SignUpScreen()
     }
 }

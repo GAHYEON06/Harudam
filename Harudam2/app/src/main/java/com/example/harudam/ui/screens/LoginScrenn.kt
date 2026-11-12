@@ -1,10 +1,8 @@
 package com.example.harudam.ui.screens
 
-import android.util.Patterns
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -18,10 +16,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.harudam.AuthRepository
+import com.example.harudam.viewmodel.LoginUiState
 
 private val LoginAccent = Color(0xFF4968C8)
 private val LoginInk = Color(0xFF34445E)
@@ -31,17 +28,16 @@ private val LoginCanvas = Color(0xFFF5F4FA)
 
 @Composable
 fun LoginScreen(
-    onLoginClick: () -> Unit = {},
+    uiState: LoginUiState,
+    onEmailChange: (String) -> Unit,
+    onPasswordChange: (String) -> Unit,
+    onLoginClick: () -> Unit,
     onGoogleLoginClick: () -> Unit = {},
     onSignUpClick: () -> Unit = {},
+    isLoading: Boolean = false,
+    message: String? = null,
 ) {
-    val repository = remember { AuthRepository() }
-
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
-    var loading by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf("") }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -52,229 +48,181 @@ fun LoginScreen(
                 .fillMaxSize()
                 .imePadding()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 8.dp, vertical = 12.dp),
+                .padding(horizontal = 30.dp, vertical = 40.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Column(
-                modifier = Modifier.padding(
-                    horizontal = 22.dp,
-                    vertical = 28.dp
-                ),
-                horizontalAlignment = Alignment.CenterHorizontally
+            Text(
+                text = "HARUDAM",
+                color = LoginAccent,
+                fontSize = 35.sp,
+                fontWeight = FontWeight.Bold
+            )
+
+            Spacer(Modifier.height(7.dp))
+
+            Text(
+                text = "여행 기록을 이어서 계획해 보세요.",
+                color = LoginHint,
+                fontSize = 13.sp
+            )
+
+            Spacer(Modifier.height(70.dp))
+
+            OutlinedTextField(
+                value = uiState.email,
+                onValueChange = onEmailChange,
+                enabled = !isLoading,
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Email") },
+                placeholder = { Text("이메일 주소") },
+                singleLine = true,
+                isError = uiState.emailError != null,
+                shape = RoundedCornerShape(14.dp),
+                colors = loginFieldColors()
+            )
+
+            uiState.emailError?.let {
+                Text(
+                    text = it,
+                    color = MaterialTheme.colorScheme.error,
+                    fontSize = 12.sp,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            Spacer(Modifier.height(13.dp))
+
+            OutlinedTextField(
+                value = uiState.password,
+                onValueChange = onPasswordChange,
+                enabled = !isLoading,
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Password") },
+                placeholder = { Text("비밀번호") },
+                singleLine = true,
+                isError = uiState.passwordError != null,
+                visualTransformation =
+                    if (passwordVisible) VisualTransformation.None
+                    else PasswordVisualTransformation(),
+                trailingIcon = {
+                    IconButton(
+                        enabled = !isLoading,
+                        onClick = {
+                            passwordVisible = !passwordVisible
+                        }
+                    ) {
+                        Icon(
+                            imageVector =
+                                if (passwordVisible) Icons.Filled.Visibility
+                                else Icons.Filled.VisibilityOff,
+                            contentDescription =
+                                if (passwordVisible) "비밀번호 숨기기"
+                                else "비밀번호 보이기",
+                            tint = LoginHint
+                        )
+                    }
+                },
+                shape = RoundedCornerShape(14.dp),
+                colors = loginFieldColors()
+            )
+
+            uiState.passwordError?.let {
+                Text(
+                    text = it,
+                    color = MaterialTheme.colorScheme.error,
+                    fontSize = 12.sp,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            if (!message.isNullOrBlank()) {
+                Spacer(Modifier.height(12.dp))
+
+                Text(
+                    text = message,
+                    color = LoginInk,
+                    fontSize = 13.sp,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            Spacer(Modifier.height(22.dp))
+
+            Button(
+                onClick = onLoginClick,
+                enabled = !isLoading,
+                modifier = Modifier.fillMaxWidth().height(54.dp),
+                shape = RoundedCornerShape(13.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = LoginAccent
+                )
             ) {
                 Text(
-                    text = "HARUDAM",
-                    color = LoginAccent,
-                    fontSize = 35.sp,
+                    text = if (isLoading) "로그인 중…" else "로그인",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
+            Spacer(Modifier.height(23.dp))
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier.weight(1f).height(1.dp)
+                        .background(LoginLine)
+                )
+
+                Text(
+                    text = "또는 Google 계정으로 로그인",
+                    modifier = Modifier.padding(horizontal = 10.dp),
+                    color = LoginHint,
+                    fontSize = 12.sp
+                )
+
+                Box(
+                    Modifier.weight(1f).height(1.dp)
+                        .background(LoginLine)
+                )
+            }
+
+            Spacer(Modifier.height(17.dp))
+
+            OutlinedButton(
+                onClick = onGoogleLoginClick,
+                enabled = !isLoading,
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                shape = RoundedCornerShape(13.dp)
+            ) {
+                Text(
+                    text = "G",
+                    color = Color(0xFF4285F4),
                     fontWeight = FontWeight.Bold
                 )
 
-                Spacer(Modifier.height(7.dp))
+                Spacer(Modifier.width(12.dp))
 
+                Text("Google로 계속하기", color = LoginInk)
+            }
+
+            Spacer(Modifier.height(20.dp))
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = "여행 기록을 이어서 계획해 보세요.",
+                    "계정이 없으신가요?",
                     color = LoginHint,
                     fontSize = 13.sp
                 )
 
-                Spacer(Modifier.height(70.dp))
-
-                OutlinedTextField(
-                    value = email,
-                    onValueChange = {
-                        email = it
-                        errorMessage = ""
-                    },
-                    enabled = !loading,
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Email", fontSize = 12.sp) },
-                    placeholder = {
-                        Text(
-                            "이메일 주소",
-                            color = LoginHint,
-                            fontSize = 13.sp
-                        )
-                    },
-                    singleLine = true,
-                    shape = RoundedCornerShape(14.dp),
-                    colors = authFieldColors()
-                )
-
-                Spacer(Modifier.height(13.dp))
-
-                OutlinedTextField(
-                    value = password,
-                    onValueChange = {
-                        password = it
-                        errorMessage = ""
-                    },
-                    enabled = !loading,
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Password", fontSize = 12.sp) },
-                    placeholder = {
-                        Text(
-                            "비밀번호",
-                            color = LoginHint,
-                            fontSize = 13.sp
-                        )
-                    },
-                    singleLine = true,
-                    visualTransformation =
-                        if (passwordVisible) VisualTransformation.None
-                        else PasswordVisualTransformation(),
-                    trailingIcon = {
-                        IconButton(
-                            enabled = !loading,
-                            onClick = {
-                                passwordVisible = !passwordVisible
-                            }
-                        ) {
-                            Icon(
-                                imageVector =
-                                    if (passwordVisible) Icons.Filled.Visibility
-                                    else Icons.Filled.VisibilityOff,
-                                contentDescription =
-                                    if (passwordVisible) "비밀번호 숨기기"
-                                    else "비밀번호 보이기",
-                                tint = LoginHint
-                            )
-                        }
-                    },
-                    shape = RoundedCornerShape(14.dp),
-                    colors = authFieldColors()
-                )
-
-                Spacer(Modifier.height(12.dp))
-
-                if (errorMessage.isNotBlank()) {
-                    Text(
-                        text = errorMessage,
-                        color = MaterialTheme.colorScheme.error,
-                        fontSize = 13.sp,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    Spacer(Modifier.height(10.dp))
-                }
-
-                Button(
-                    enabled = !loading,
-                    onClick = {
-                        val inputEmail = email.trim()
-
-                        errorMessage = when {
-                            !Patterns.EMAIL_ADDRESS
-                                .matcher(inputEmail).matches() ->
-                                "올바른 이메일 주소를 입력해 주세요."
-
-                            password.isEmpty() ->
-                                "비밀번호를 입력해 주세요."
-
-                            else -> ""
-                        }
-
-                        if (errorMessage.isBlank()) {
-                            loading = true
-
-                            repository.login(
-                                email = inputEmail,
-                                password = password,
-                                onSuccess = {
-                                    loading = false
-                                    password = ""
-                                    onLoginClick()
-                                },
-                                onError = {
-                                    loading = false
-                                    errorMessage = it
-                                }
-                            )
-                        }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(54.dp),
-                    shape = RoundedCornerShape(13.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = LoginAccent
-                    )
+                TextButton(
+                    onClick = onSignUpClick,
+                    enabled = !isLoading
                 ) {
                     Text(
-                        text = if (loading) "로그인 중…" else "로그인",
-                        fontSize = 15.sp,
+                        "회원가입",
+                        color = LoginAccent,
                         fontWeight = FontWeight.SemiBold
                     )
-                }
-
-                Spacer(Modifier.height(23.dp))
-
-                AuthDivider("또는 Google 계정으로 로그인")
-
-                Spacer(Modifier.height(17.dp))
-
-                OutlinedButton(
-                    enabled = !loading,
-                    onClick = onGoogleLoginClick,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(50.dp),
-                    shape = RoundedCornerShape(13.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(24.dp)
-                                .background(
-                                    Color(0xFFF1F4FC),
-                                    CircleShape
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                "G",
-                                color = Color(0xFF4285F4),
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 15.sp
-                            )
-                        }
-
-                        Spacer(Modifier.size(10.dp))
-
-                        Text(
-                            "Google로 계속하기",
-                            color = LoginInk,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                }
-
-                Spacer(Modifier.height(20.dp))
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        "계정이 없으신가요?",
-                        color = LoginHint,
-                        fontSize = 13.sp
-                    )
-
-                    TextButton(
-                        enabled = !loading,
-                        onClick = onSignUpClick
-                    ) {
-                        Text(
-                            "회원가입",
-                            color = LoginAccent,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
                 }
             }
         }
@@ -282,33 +230,7 @@ fun LoginScreen(
 }
 
 @Composable
-private fun AuthDivider(label: String) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            Modifier
-                .weight(1f)
-                .height(1.dp)
-                .background(LoginLine)
-        )
-
-        Text(
-            label,
-            modifier = Modifier.padding(horizontal = 10.dp),
-            color = LoginHint,
-            fontSize = 12.sp
-        )
-
-        Box(
-            Modifier
-                .weight(1f)
-                .height(1.dp)
-                .background(LoginLine)
-        )
-    }
-}
-
-@Composable
-private fun authFieldColors() = OutlinedTextFieldDefaults.colors(
+private fun loginFieldColors() = OutlinedTextFieldDefaults.colors(
     focusedBorderColor = LoginAccent,
     unfocusedBorderColor = LoginLine,
     focusedLabelColor = LoginAccent,
@@ -317,11 +239,3 @@ private fun authFieldColors() = OutlinedTextFieldDefaults.colors(
     unfocusedTextColor = LoginInk,
     cursorColor = LoginAccent
 )
-
-@Preview(showBackground = true)
-@Composable
-private fun LoginScreenPreview() {
-    MaterialTheme {
-        LoginScreen()
-    }
-}
