@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "937294989675",
+    "project_id": "mobile-pg-b27d4",
+    "storage_bucket": "mobile-pg-b27d4.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:937294989675:android:7510d676f9f3b24160a42e",
+        "android_client_info": {
+          "package_name": "com.example.harudam"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "937294989675-8bv63msbvmr92nae7t04k62au6ev23su.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCrJceA_5zrX5MznUJziAg6C8V8DeAFVJ8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "937294989675-8bv63msbvmr92nae7t04k62au6ev23su.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
