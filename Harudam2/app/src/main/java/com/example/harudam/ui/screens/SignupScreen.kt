@@ -37,6 +37,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import android.util.Patterns
+import com.example.harudam.viewmodel.SignUpUiState
 
 private val AuthBlue = Color(0xFF4968C8)
 private val AuthText = Color(0xFF34445E)
@@ -46,18 +47,15 @@ private val AuthBackground = Color(0xFFF3F1FA)
 
 @Composable
 fun SignUpScreen(
+    uiState: SignUpUiState,
+    onEmailChange: (String) -> Unit,
+    onPasswordChange: (String) -> Unit,
+    onAgreementChange: (Boolean) -> Unit,
     onSignUpClick: () -> Unit = {},
     onGoogleSignUpClick: () -> Unit = {},
     onLoginClick: () -> Unit = {},
     onBackClick: () -> Unit = {},
 ) {
-    val email = remember { mutableStateOf("") }
-    val password = remember { mutableStateOf("") }
-    val agreedToPersonalData = remember { mutableStateOf(false) }
-    val emailError = remember { mutableStateOf<String?>(null) }
-    val passwordError = remember { mutableStateOf<String?>(null) }
-    val agreementError = remember { mutableStateOf(false) }
-    val validationPassed = remember { mutableStateOf(false) }
 
     Surface(modifier = Modifier.fillMaxSize(), color = AuthBackground) {
         Column(
@@ -93,30 +91,26 @@ fun SignUpScreen(
                     Spacer(Modifier.height(24.dp))
 
                     Spacer(Modifier.height(12.dp))
+
                     AuthInputField(
                         label = "Email",
                         hint = "이메일 주소를 입력하세요",
-                        value = email.value,
-                        onValueChange = {
-                            email.value = it
-                            emailError.value = null
-                            validationPassed.value = false
-                        },
-                        errorMessage = emailError.value,
+                        value = uiState.email,
+                        onValueChange = onEmailChange,
+                        errorMessage = uiState.emailError,
                     )
+
                     Spacer(Modifier.height(12.dp))
+
                     AuthInputField(
                         label = "Password",
                         hint = "비밀번호를 입력하세요",
-                        value = password.value,
-                        onValueChange = {
-                            password.value = it
-                            passwordError.value = null
-                            validationPassed.value = false
-                        },
+                        value = uiState.password,
+                        onValueChange = onPasswordChange,
                         password = true,
-                        errorMessage = passwordError.value,
+                        errorMessage = uiState.passwordError,
                     )
+
 
                     Spacer(Modifier.height(10.dp))
                     Row(
@@ -124,20 +118,18 @@ fun SignUpScreen(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Checkbox(
-                            checked = agreedToPersonalData.value,
-                            onCheckedChange = {
-                                agreedToPersonalData.value = it
-                                agreementError.value = false
-                                validationPassed.value = false
-                            },
-                            colors = androidx.compose.material3.CheckboxDefaults.colors(checkedColor = AuthBlue),
+                            checked = uiState.agreedToPersonalData,
+                            onCheckedChange = onAgreementChange,
+                            colors = androidx.compose.material3.CheckboxDefaults.colors(
+                                checkedColor = AuthBlue
+                            ),
                         )
                         Text("개인정보 처리에 동의합니다", color = AuthMuted, fontSize = 12.sp)
                         TextButton(onClick = {}) {
                             Text("보기", color = AuthBlue, fontSize = 12.sp)
                         }
                     }
-                    if (agreementError.value) {
+                    if (uiState.agreementError) {
                         Text(
                             text = "개인정보 처리에 동의해 주세요.",
                             color = MaterialTheme.colorScheme.error,
@@ -147,47 +139,22 @@ fun SignUpScreen(
 
                     Spacer(Modifier.height(9.dp))
                     Button(
-
-                        onClick = {
-                            val inputEmail = email.value.trim()
-                            val inputPassword = password.value
-
-                            // 이메일 검증
-                            emailError.value = when {
-                                inputEmail.isEmpty() ->
-                                    "이메일을 입력해 주세요."
-
-                                !Patterns.EMAIL_ADDRESS.matcher(inputEmail).matches() ->
-                                    "올바른 이메일 형식이 아닙니다."
-
-                                else -> null
-                            }
-
-                            // 비밀번호 검증
-                            passwordError.value = when {
-                                inputPassword.isEmpty() ->
-                                    "비밀번호를 입력해 주세요."
-
-                                else -> null
-                            }
-
-                            // 개인정보 처리 동의 검증
-                            agreementError.value = !agreedToPersonalData.value
-
-                            // 모든 조건 통과 여부
-                            validationPassed.value =
-                                emailError.value == null &&
-                                        passwordError.value == null &&
-                                        !agreementError.value
-                        },
-
-                        modifier = Modifier.fillMaxWidth().height(54.dp),
+                        onClick = onSignUpClick,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(54.dp),
                         shape = RoundedCornerShape(13.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = AuthBlue),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = AuthBlue
+                        ),
                     ) {
-                        Text("회원가입", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            "회원가입",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
                     }
-                    if (validationPassed.value) {
+                    if (uiState.isInputValid) {
                         Text(
                             text = "입력값 검증을 통과했습니다. (API 연결 전)",
                             color = AuthBlue,
@@ -281,5 +248,12 @@ private fun AuthSignUpDivider() {
 @Preview(showBackground = true)
 @Composable
 private fun SignUpScreenPreview() {
-    MaterialTheme { SignUpScreen() }
+    MaterialTheme {
+        SignUpScreen(
+            uiState = SignUpUiState(),
+            onEmailChange = {},
+            onPasswordChange = {},
+            onAgreementChange = {}
+        )
+    }
 }

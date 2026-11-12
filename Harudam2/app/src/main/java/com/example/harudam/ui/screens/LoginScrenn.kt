@@ -44,6 +44,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import android.util.Patterns
+import com.example.harudam.viewmodel.LoginUiState
 
 private val LoginAccent = Color(0xFF4968C8)
 private val LoginInk = Color(0xFF34445E)
@@ -53,16 +54,14 @@ private val LoginCanvas = Color(0xFFF5F4FA)
 
 @Composable
 fun LoginScreen(
-    onLoginClick: () -> Unit = {},
+    uiState: LoginUiState,
+    onEmailChange: (String) -> Unit,
+    onPasswordChange: (String) -> Unit,
+    onLoginClick: () -> Unit,
     onGoogleLoginClick: () -> Unit = {},
     onSignUpClick: () -> Unit = {},
 ) {
-    val email = remember { mutableStateOf("") }
-    val password = remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
-    val emailError = remember { mutableStateOf<String?>(null) }
-    val passwordError = remember { mutableStateOf<String?>(null) }
-    val validationPassed = remember { mutableStateOf(false) }
 
     Surface(modifier = Modifier.fillMaxSize(), color = LoginCanvas) {
         Column(
@@ -84,30 +83,26 @@ fun LoginScreen(
                         fontWeight = FontWeight.Bold,
                     )
                     Spacer(Modifier.height(7.dp))
-                    Text("여행 기록을 이어서 계획해 보세요.", color = LoginHint, fontSize = 13.sp)
+                    Text("여행을 이어서 계획해 보세요.", color = LoginHint, fontSize = 13.sp)
                     Spacer(Modifier.height(70.dp))
 
 
                     OutlinedTextField(
-                        value = email.value,
-                        onValueChange = {
-                            email.value = it
-                            emailError.value = null
-                            validationPassed.value = false
-                        },
+                        value = uiState.email,
+                        onValueChange = onEmailChange,
                         modifier = Modifier.fillMaxWidth(),
                         label = { Text("Email", fontSize = 12.sp) },
                         placeholder = {
                             Text("이메일 주소", color = LoginHint, fontSize = 13.sp)
                         },
                         singleLine = true,
-                        isError = emailError.value != null,
+                        isError = uiState.emailError != null,
                         shape = RoundedCornerShape(14.dp),
                         colors = authFieldColors(),
                     )
 
 // 이메일 오류 메시지
-                    emailError.value?.let { message ->
+                    uiState.emailError?.let { message ->
                         Text(
                             text = message,
                             color = MaterialTheme.colorScheme.error,
@@ -120,15 +115,12 @@ fun LoginScreen(
 
                     Spacer(Modifier.height(13.dp))
                     OutlinedTextField(
-                        value = password.value,
-                        onValueChange = {
-                            password.value = it
-                            passwordError.value = null
-                            validationPassed.value = false },
+                        value = uiState.password,
+                        onValueChange = onPasswordChange,
+                        isError = uiState.passwordError != null,
                         modifier = Modifier.fillMaxWidth(),
                         label = { Text("Password", fontSize = 12.sp) },
                         placeholder = { Text("비밀번호", color = LoginHint, fontSize = 13.sp) },
-                        isError = passwordError.value != null,
                         singleLine = true,
                         visualTransformation = if (passwordVisible) {
                             VisualTransformation.None
@@ -157,7 +149,7 @@ fun LoginScreen(
                         shape = RoundedCornerShape(14.dp),
                         colors = authFieldColors(),
                     )
-                    passwordError.value?.let { message ->
+                    uiState.passwordError?.let { message ->
                         Text(
                             text = message,
                             color = MaterialTheme.colorScheme.error,
@@ -170,34 +162,7 @@ fun LoginScreen(
                     Spacer(Modifier.height(22.dp))
                     Button(
 
-                        onClick = {
-                            val inputEmail = email.value.trim()
-                            val inputPassword = password.value
-
-                            // 1. 이메일 검증
-                            emailError.value = when {
-                                inputEmail.isEmpty() ->
-                                    "이메일을 입력해 주세요."
-
-                                !Patterns.EMAIL_ADDRESS.matcher(inputEmail).matches() ->
-                                    "올바른 이메일 형식이 아닙니다."
-
-                                else -> null
-                            }
-
-                            // 2. 비밀번호 검증
-                            passwordError.value = when {
-                                inputPassword.isBlank() ->
-                                    "비밀번호를 입력해 주세요."
-
-                                else -> null
-                            }
-
-                            // 3. 전체 검증 결과
-                            validationPassed.value =
-                                emailError.value == null &&
-                                        passwordError.value == null
-                        },
+                        onClick = onLoginClick,
 
                         modifier = Modifier.fillMaxWidth().height(54.dp),
                         shape = RoundedCornerShape(13.dp),
@@ -205,12 +170,11 @@ fun LoginScreen(
                     ) {
                         Text("로그인", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                     }
-                    if (validationPassed.value) {
+                    if (uiState.isInputValid) {
                         Text(
                             text = "입력값 검증을 통과했습니다. (API 연결 전)",
                             color = LoginAccent,
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(top = 8.dp)
+                            fontSize = 12.sp
                         )
                     }
 
@@ -269,5 +233,12 @@ private fun authFieldColors() = OutlinedTextFieldDefaults.colors(
 @Preview(showBackground = true)
 @Composable
 private fun LoginScreenPreview() {
-    MaterialTheme { LoginScreen() }
+    MaterialTheme {
+        LoginScreen(
+            uiState = LoginUiState(),
+            onEmailChange = {},
+            onPasswordChange = {},
+            onLoginClick = {}
+        )
+    }
 }
