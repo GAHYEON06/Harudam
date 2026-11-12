@@ -1,42 +1,25 @@
 package com.example.harudam.ui.screens
 
+import android.util.Patterns
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import android.util.Patterns
+import com.example.harudam.AuthRepository
 
 private val AuthBlue = Color(0xFF4968C8)
 private val AuthText = Color(0xFF34445E)
@@ -51,175 +34,298 @@ fun SignUpScreen(
     onLoginClick: () -> Unit = {},
     onBackClick: () -> Unit = {},
 ) {
-    val email = remember { mutableStateOf("") }
-    val password = remember { mutableStateOf("") }
-    val agreedToPersonalData = remember { mutableStateOf(false) }
-    val emailError = remember { mutableStateOf<String?>(null) }
-    val passwordError = remember { mutableStateOf<String?>(null) }
-    val agreementError = remember { mutableStateOf(false) }
-    val validationPassed = remember { mutableStateOf(false) }
+    val repository = remember { AuthRepository() }
 
-    Surface(modifier = Modifier.fillMaxSize(), color = AuthBackground) {
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var agreedToPersonalData by remember { mutableStateOf(false) }
+
+    var emailError by remember { mutableStateOf<String?>(null) }
+    var passwordError by remember { mutableStateOf<String?>(null) }
+    var agreementError by remember { mutableStateOf(false) }
+    var serverError by remember { mutableStateOf<String?>(null) }
+    var loading by remember { mutableStateOf(false) }
+
+    BackHandler {
+        if (!loading) {
+            onBackClick()
+        }
+    }
+
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = AuthBackground
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .imePadding()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 8.dp, vertical = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
+            verticalArrangement = Arrangement.Center
         ) {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 color = Color.White,
-                shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp, bottomStart = 14.dp, bottomEnd = 14.dp),
+                shape = RoundedCornerShape(
+                    topStart = 26.dp,
+                    topEnd = 26.dp,
+                    bottomStart = 14.dp,
+                    bottomEnd = 14.dp
+                )
             ) {
                 Column(
-                    modifier = Modifier.padding(horizontal = 22.dp, vertical = 22.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.padding(
+                        horizontal = 22.dp,
+                        vertical = 22.dp
+                    ),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     TextButton(
                         onClick = onBackClick,
-                        modifier = Modifier.align(Alignment.Start),
+                        enabled = !loading,
+                        modifier = Modifier.align(Alignment.Start)
                     ) {
-                        Text("‹  뒤로", color = AuthMuted, fontSize = 14.sp)
+                        Text(
+                            "‹  뒤로",
+                            color = AuthMuted,
+                            fontSize = 14.sp
+                        )
                     }
 
                     Text(
                         text = "회원가입",
                         color = AuthBlue,
                         fontSize = 26.sp,
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.Bold
                     )
-                    Spacer(Modifier.height(24.dp))
 
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(36.dp))
+
                     AuthInputField(
                         label = "Email",
                         hint = "이메일 주소를 입력하세요",
-                        value = email.value,
+                        value = email,
                         onValueChange = {
-                            email.value = it
-                            emailError.value = null
-                            validationPassed.value = false
+                            email = it
+                            emailError = null
+                            serverError = null
                         },
-                        errorMessage = emailError.value,
+                        enabled = !loading,
+                        errorMessage = emailError
                     )
+
                     Spacer(Modifier.height(12.dp))
+
                     AuthInputField(
                         label = "Password",
                         hint = "비밀번호를 입력하세요",
-                        value = password.value,
+                        value = password,
                         onValueChange = {
-                            password.value = it
-                            passwordError.value = null
-                            validationPassed.value = false
+                            password = it
+                            passwordError = null
+                            serverError = null
                         },
+                        enabled = !loading,
                         password = true,
-                        errorMessage = passwordError.value,
+                        errorMessage = passwordError
                     )
 
                     Spacer(Modifier.height(10.dp))
+
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Checkbox(
-                            checked = agreedToPersonalData.value,
+                            checked = agreedToPersonalData,
+                            enabled = !loading,
                             onCheckedChange = {
-                                agreedToPersonalData.value = it
-                                agreementError.value = false
-                                validationPassed.value = false
+                                agreedToPersonalData = it
+                                agreementError = false
                             },
-                            colors = androidx.compose.material3.CheckboxDefaults.colors(checkedColor = AuthBlue),
+                            colors = CheckboxDefaults.colors(
+                                checkedColor = AuthBlue
+                            )
                         )
-                        Text("개인정보 처리에 동의합니다", color = AuthMuted, fontSize = 12.sp)
-                        TextButton(onClick = {}) {
-                            Text("보기", color = AuthBlue, fontSize = 12.sp)
+
+                        Text(
+                            "개인정보 처리에 동의합니다",
+                            color = AuthMuted,
+                            fontSize = 12.sp
+                        )
+
+                        // 기존 '보기' 버튼. 약관 화면 연결은 별도 작업.
+                        TextButton(
+                            enabled = !loading,
+                            onClick = {}
+                        ) {
+                            Text(
+                                "보기",
+                                color = AuthBlue,
+                                fontSize = 12.sp
+                            )
                         }
                     }
-                    if (agreementError.value) {
+
+                    if (agreementError) {
                         Text(
-                            text = "개인정보 처리에 동의해 주세요.",
+                            "개인정보 처리에 동의해 주세요.",
                             color = MaterialTheme.colorScheme.error,
                             fontSize = 12.sp
                         )
                     }
 
+                    if (serverError != null) {
+                        Spacer(Modifier.height(8.dp))
+
+                        Text(
+                            text = serverError.orEmpty(),
+                            color = MaterialTheme.colorScheme.error,
+                            fontSize = 12.sp,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+
                     Spacer(Modifier.height(9.dp))
+
                     Button(
-
+                        enabled = !loading,
                         onClick = {
-                            val inputEmail = email.value.trim()
-                            val inputPassword = password.value
+                            val inputEmail = email.trim()
+                            val inputPassword = password
 
-                            // 이메일 검증
-                            emailError.value = when {
+                            serverError = null
+
+                            emailError = when {
                                 inputEmail.isEmpty() ->
                                     "이메일을 입력해 주세요."
 
-                                !Patterns.EMAIL_ADDRESS.matcher(inputEmail).matches() ->
+                                !Patterns.EMAIL_ADDRESS
+                                    .matcher(inputEmail).matches() ->
                                     "올바른 이메일 형식이 아닙니다."
 
                                 else -> null
                             }
 
-                            // 비밀번호 검증
-                            passwordError.value = when {
+                            passwordError = when {
                                 inputPassword.isEmpty() ->
                                     "비밀번호를 입력해 주세요."
+
+                                inputPassword.length < 6 ->
+                                    "비밀번호는 최소 6자 이상 입력해 주세요."
 
                                 else -> null
                             }
 
-                            // 개인정보 처리 동의 검증
-                            agreementError.value = !agreedToPersonalData.value
+                            agreementError = !agreedToPersonalData
 
-                            // 모든 조건 통과 여부
-                            validationPassed.value =
-                                emailError.value == null &&
-                                        passwordError.value == null &&
-                                        !agreementError.value
+                            if (
+                                emailError == null &&
+                                passwordError == null &&
+                                !agreementError
+                            ) {
+                                loading = true
+
+                                repository.signUp(
+                                    username = inputEmail
+                                        .substringBefore("@")
+                                        .take(30),
+                                    email = inputEmail,
+                                    password = inputPassword,
+                                    onSuccess = {
+                                        loading = false
+                                        password = ""
+                                        onSignUpClick()
+                                    },
+                                    onError = {
+                                        loading = false
+                                        serverError = it
+                                    }
+                                )
+                            }
                         },
-
-                        modifier = Modifier.fillMaxWidth().height(54.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(54.dp),
                         shape = RoundedCornerShape(13.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = AuthBlue),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = AuthBlue
+                        )
                     ) {
-                        Text("회원가입", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                    }
-                    if (validationPassed.value) {
                         Text(
-                            text = "입력값 검증을 통과했습니다. (API 연결 전)",
-                            color = AuthBlue,
-                            fontSize = 12.sp
+                            text = if (loading) "가입 중…" else "회원가입",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.SemiBold
                         )
                     }
 
                     Spacer(Modifier.height(22.dp))
+
                     AuthSignUpDivider()
+
                     Spacer(Modifier.height(14.dp))
+
                     OutlinedButton(
+                        enabled = !loading,
                         onClick = onGoogleSignUpClick,
-                        modifier = Modifier.fillMaxWidth().height(50.dp),
-                        shape = RoundedCornerShape(13.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp),
+                        shape = RoundedCornerShape(13.dp)
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                             Box(
-                                modifier = Modifier.size(23.dp).background(Color(0xFFF1F4FC), CircleShape),
-                                contentAlignment = Alignment.Center,
+                                modifier = Modifier
+                                    .size(23.dp)
+                                    .background(
+                                        Color(0xFFF1F4FC),
+                                        CircleShape
+                                    ),
+                                contentAlignment = Alignment.Center
                             ) {
-                                Text("G", color = Color(0xFF4285F4), fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                Text(
+                                    "G",
+                                    color = Color(0xFF4285F4),
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 15.sp
+                                )
                             }
+
                             Spacer(Modifier.size(9.dp))
-                            Text("Google 계정으로 가입", color = AuthText, fontSize = 14.sp)
+
+                            Text(
+                                "Google 계정으로 가입",
+                                color = AuthText,
+                                fontSize = 14.sp
+                            )
                         }
                     }
 
                     Spacer(Modifier.height(13.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("이미 계정이 있나요?", color = AuthMuted, fontSize = 12.sp)
-                        TextButton(onClick = onLoginClick) {
-                            Text("로그인", color = AuthBlue, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            "이미 계정이 있나요?",
+                            color = AuthMuted,
+                            fontSize = 12.sp
+                        )
+
+                        TextButton(
+                            enabled = !loading,
+                            onClick = onLoginClick
+                        ) {
+                            Text(
+                                "로그인",
+                                color = AuthBlue,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
                         }
                     }
                 }
@@ -234,19 +340,27 @@ private fun AuthInputField(
     hint: String,
     value: String,
     onValueChange: (String) -> Unit,
+    enabled: Boolean = true,
     password: Boolean = false,
     errorMessage: String? = null,
 ) {
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
+        enabled = enabled,
         modifier = Modifier.fillMaxWidth(),
-        label = { Text(label, fontSize = 12.sp) },
-        placeholder = { Text(hint, color = AuthMuted, fontSize = 13.sp) },
+        label = {
+            Text(label, fontSize = 12.sp)
+        },
+        placeholder = {
+            Text(hint, color = AuthMuted, fontSize = 13.sp)
+        },
         singleLine = true,
         shape = RoundedCornerShape(14.dp),
         isError = errorMessage != null,
-        visualTransformation = if (password) PasswordVisualTransformation() else androidx.compose.ui.text.input.VisualTransformation.None,
+        visualTransformation =
+            if (password) PasswordVisualTransformation()
+            else VisualTransformation.None,
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = AuthBlue,
             unfocusedBorderColor = AuthBorder,
@@ -254,9 +368,10 @@ private fun AuthInputField(
             unfocusedLabelColor = AuthText,
             focusedTextColor = AuthText,
             unfocusedTextColor = AuthText,
-            cursorColor = AuthBlue,
-        ),
+            cursorColor = AuthBlue
+        )
     )
+
     if (errorMessage != null) {
         Text(
             text = errorMessage,
@@ -272,14 +387,33 @@ private fun AuthInputField(
 @Composable
 private fun AuthSignUpDivider() {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.weight(1f).height(1.dp).background(AuthBorder))
-        Text("또는", modifier = Modifier.padding(horizontal = 10.dp), color = AuthMuted, fontSize = 12.sp)
-        Box(Modifier.weight(1f).height(1.dp).background(AuthBorder))
+        Box(
+            Modifier
+                .weight(1f)
+                .height(1.dp)
+                .background(AuthBorder)
+        )
+
+        Text(
+            "또는",
+            modifier = Modifier.padding(horizontal = 10.dp),
+            color = AuthMuted,
+            fontSize = 12.sp
+        )
+
+        Box(
+            Modifier
+                .weight(1f)
+                .height(1.dp)
+                .background(AuthBorder)
+        )
     }
 }
 
 @Preview(showBackground = true)
 @Composable
 private fun SignUpScreenPreview() {
-    MaterialTheme { SignUpScreen() }
+    MaterialTheme {
+        SignUpScreen()
+    }
 }
