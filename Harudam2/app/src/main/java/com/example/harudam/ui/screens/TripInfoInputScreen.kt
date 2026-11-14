@@ -1,6 +1,7 @@
 package com.example.harudam.ui.screens
 
 import android.app.DatePickerDialog
+import android.net.Uri
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -58,20 +59,37 @@ private val CreateText = Color(0xFF554239)
 private val CreateSubtext = Color(0xFF7D6A60)
 private val CreateBorder = Color(0xFFECE5DC)
 
+private data class ImportedPlaceUi(
+    val id: String,
+    val name: String,
+    val category: String,
+    val latitude: Double,
+    val longitude: Double,
+)
+
+private val mockPlaces = listOf(
+    ImportedPlaceUi("mock-1", "초량밀면", "음식·카페", 35.1150, 129.0400),
+    ImportedPlaceUi("mock-2", "코이", "음식·카페", 35.1510, 129.1130),
+    ImportedPlaceUi("mock-3", "광안리해수욕장", "관광", 35.1532, 129.1187),
+)
+
 /** Figma screen 2: 여행 이름과 여행 기간을 입력합니다. */
 @Composable
 fun TripInfoInputScreen(
     onBackClick: () -> Unit = {},
     onConfirmPlacesClick: () -> Unit = {},
+    onAddUrlClick: (String) -> Unit = {},
 ) {
     var tripName by remember { mutableStateOf("") }
     var startDateMillis by remember { mutableStateOf<Long?>(null) }
     var endDateMillis by remember { mutableStateOf<Long?>(null) }
     var placeListUrl by remember { mutableStateOf("") }
     val importedPlaces = remember {
-        mutableStateListOf<String>()
+        mutableStateListOf<ImportedPlaceUi>()
     }
     var deletePlaceTargetIndex by remember { mutableStateOf<Int?>(null) }
+    var placeUrlMessage by remember { mutableStateOf<String?>(null) }
+    var isPlaceUrlError by remember { mutableStateOf(false) }
 
     val tripInfoComplete = tripName.isNotBlank() &&
             startDateMillis != null &&
@@ -105,11 +123,28 @@ fun TripInfoInputScreen(
                     },
                     onEndDateSelected = { endDateMillis = it },
                     placeListUrl = placeListUrl,
-                    onPlaceListUrlChange = { placeListUrl = it },
+                    onPlaceListUrlChange = {
+                        placeListUrl = it
+                        placeUrlMessage = null
+                    },
+                    onAddUrlClick = { url ->
+                        if (isValidNaverMapUrl(url)) {
+                            importedPlaces.clear()
+                            importedPlaces.addAll(mockPlaces)
+                            placeUrlMessage = "테스트용 예시 장소 3개를 표시했어요. 실제 URL 파싱은 아직 연결되지 않았어요."
+                            isPlaceUrlError = false
+                            onAddUrlClick(url)
+                        } else {
+                            placeUrlMessage = "naver.me 또는 map.naver.com 공유 링크를 입력해 주세요."
+                            isPlaceUrlError = true
+                        }
+                    },
+                    placeUrlMessage = placeUrlMessage,
+                    isPlaceUrlError = isPlaceUrlError,
                     placesEnabled = tripInfoComplete,
                 )
                 Spacer(Modifier.height(18.dp))
-                CreateMapPlaceholder(hasPlaces = importedPlaces.isNotEmpty())
+                CreateMapPlaceholder(places = importedPlaces)
                 Spacer(Modifier.height(14.dp))
                 Text(
                     text = "여행 장소 ${importedPlaces.size}",
@@ -137,9 +172,9 @@ fun TripInfoInputScreen(
                         }
                     }
                 } else {
-                    importedPlaces.forEachIndexed { index, name ->
+                    importedPlaces.forEachIndexed { index, place ->
                         ImportedPlaceRow(
-                            name = name,
+                            place = place,
                             onDeleteClick = { deletePlaceTargetIndex = index },
                         )
                         if (index != importedPlaces.lastIndex) {
@@ -174,12 +209,12 @@ fun TripInfoInputScreen(
         }
 
         deletePlaceTargetIndex?.let { index ->
-            val placeName = importedPlaces.getOrNull(index)
-            if (placeName != null) {
+            val place = importedPlaces.getOrNull(index)
+            if (place != null) {
                 AlertDialog(
                     onDismissRequest = { deletePlaceTargetIndex = null },
                     title = { Text("장소를 삭제할까요?") },
-                    text = { Text("$placeName 장소를 여행 목록에서 삭제해요.") },
+                    text = { Text("${place.name} 장소를 여행 목록에서 삭제해요.") },
                     confirmButton = {
                         TextButton(
                             onClick = {
@@ -243,6 +278,9 @@ private fun CreateTripForm(
     onEndDateSelected: (Long) -> Unit,
     placeListUrl: String,
     onPlaceListUrlChange: (String) -> Unit,
+    onAddUrlClick: (String) -> Unit,
+    placeUrlMessage: String?,
+    isPlaceUrlError: Boolean,
     placesEnabled: Boolean,
 ) {
     val context = LocalContext.current
@@ -262,7 +300,7 @@ private fun CreateTripForm(
                 onValueChange = onTripNameChange,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(50.dp),
+                    .height(43.dp),
                 singleLine = true,
                 placeholder = {
                     Text("여행 이름 입력", color = CreateSubtext, fontSize = 14.sp)
@@ -351,43 +389,78 @@ private fun CreateTripForm(
             Spacer(Modifier.height(8.dp))
             FormLabel("장소 목록 URL", modifier = Modifier.padding(start = 2.dp))
             Spacer(Modifier.height(4.dp))
-            OutlinedTextField(
-                value = placeListUrl,
-                onValueChange = onPlaceListUrlChange,
-                enabled = placesEnabled,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
-                singleLine = true,
-                placeholder = {
-                    Text(
-                        text = if (placesEnabled) {
-                            "지도 목록 링크를 붙여넣으세요"
-                        } else {
-                            "여행 이름과 날짜를 먼저 입력해 주세요"
-                        },
-                        color = CreateSubtext,
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                OutlinedTextField(
+                    value = placeListUrl,
+                    onValueChange = onPlaceListUrlChange,
+                    enabled = placesEnabled,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(52.dp),
+                    singleLine = true,
+                    placeholder = {
+                        Text(
+                            text = if (placesEnabled) {
+                                "지도 목록 링크를 붙여넣으세요"
+                            } else {
+                                "여행 이름과 날짜를 먼저 입력해 주세요"
+                            },
+                            color = CreateSubtext,
+                            fontSize = 12.sp,
+                        )
+                    },
+                    textStyle = TextStyle(
+                        color = CreateText,
                         fontSize = 12.sp,
-                    )
-                },
-                textStyle = TextStyle(
-                    color = CreateText,
-                    fontSize = 12.sp,
-                ),
-                shape = RoundedCornerShape(10.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = Color.White,
-                    unfocusedContainerColor = Color.White,
-                    disabledContainerColor = Color(0xFFF1EEE8),
-                    focusedBorderColor = CreateBorder,
-                    unfocusedBorderColor = CreateBorder,
-                    disabledBorderColor = CreateBorder,
-                    focusedTextColor = CreateText,
-                    unfocusedTextColor = CreateText,
-                    disabledTextColor = CreateSubtext,
-                    cursorColor = CreateText,
-                ),
-            )
+                    ),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = Color.White,
+                        unfocusedContainerColor = Color.White,
+                        disabledContainerColor = Color(0xFFF1EEE8),
+                        focusedBorderColor = CreateBorder,
+                        unfocusedBorderColor = CreateBorder,
+                        disabledBorderColor = CreateBorder,
+                        focusedTextColor = CreateText,
+                        unfocusedTextColor = CreateText,
+                        disabledTextColor = CreateSubtext,
+                        cursorColor = CreateText,
+                    ),
+                )
+
+                val canAddUrl = placesEnabled && placeListUrl.isNotBlank()
+                Surface(
+                    modifier = Modifier
+                        .size(width = 58.dp, height = 43.dp)
+                        .clickable(
+                            enabled = canAddUrl,
+                            onClick = { onAddUrlClick(placeListUrl.trim()) },
+                        ),
+                    color = if (canAddUrl) CreateMintLight else Color(0xFFE7E3DC),
+                    shape = RoundedCornerShape(9.dp),
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            text = "추가",
+                            color = if (canAddUrl) CreateText else CreateSubtext,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                }
+            }
+            placeUrlMessage?.let { message ->
+                Spacer(Modifier.height(5.dp))
+                Text(
+                    text = message,
+                    color = if (isPlaceUrlError) Color(0xFFB3261E) else CreateSubtext,
+                    fontSize = 11.sp,
+                )
+            }
         }
     }
 }
@@ -424,7 +497,7 @@ private fun DateInputField(
 }
 
 @Composable
-private fun CreateMapPlaceholder(hasPlaces: Boolean) {
+private fun CreateMapPlaceholder(places: List<ImportedPlaceUi>) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -439,9 +512,59 @@ private fun CreateMapPlaceholder(hasPlaces: Boolean) {
             shape = RoundedCornerShape(10.dp),
             border = androidx.compose.foundation.BorderStroke(1.dp, CreateBorder),
         ) {
-            if (hasPlaces) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text("지도", color = CreateText, fontSize = 36.sp, fontWeight = FontWeight.Light)
+            if (places.isNotEmpty()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Text(
+                        text = "예시 장소 좌표 · 지도 연동 전",
+                        color = CreateSubtext,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    places.take(3).forEachIndexed { index, place ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(32.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(22.dp)
+                                    .background(CreateMintLight, CircleShape),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    text = (index + 1).toString(),
+                                    color = CreateText,
+                                    fontSize = 11.sp,
+                                )
+                            }
+                            Text(
+                                text = place.name,
+                                modifier = Modifier
+                                    .padding(start = 7.dp)
+                                    .weight(1f),
+                                color = CreateText,
+                                fontSize = 11.sp,
+                                maxLines = 1,
+                            )
+                            Text(
+                                text = String.format(
+                                    Locale.US,
+                                    "%.4f, %.4f",
+                                    place.latitude,
+                                    place.longitude,
+                                ),
+                                color = CreateSubtext,
+                                fontSize = 10.sp,
+                            )
+                        }
+                    }
                 }
             } else {
                 Column(
@@ -451,7 +574,18 @@ private fun CreateMapPlaceholder(hasPlaces: Boolean) {
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                 ) {
-
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .background(CreateMintLight, CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = "⌖",
+                            color = CreateText,
+                            fontSize = 24.sp,
+                        )
+                    }
                     Spacer(Modifier.height(9.dp))
                     Text(
                         text = "지도에 표시할 장소가 없어요",
@@ -473,7 +607,7 @@ private fun CreateMapPlaceholder(hasPlaces: Boolean) {
 
 @Composable
 private fun ImportedPlaceRow(
-    name: String,
+    place: ImportedPlaceUi,
     onDeleteClick: () -> Unit,
 ) {
     Surface(
@@ -487,8 +621,8 @@ private fun ImportedPlaceRow(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text("♧", color = Color(0xFF8AAE9A), fontSize = 20.sp)
-            Text(name, modifier = Modifier.padding(start = 9.dp).weight(1f), color = CreateText, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-            CategoryTag("음식·카페")
+            Text(place.name, modifier = Modifier.padding(start = 9.dp).weight(1f), color = CreateText, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            CategoryTag(place.category)
             IconButton(
                 onClick = onDeleteClick,
                 modifier = Modifier.size(36.dp),
@@ -497,6 +631,19 @@ private fun ImportedPlaceRow(
             }
         }
     }
+}
+
+private fun isValidNaverMapUrl(rawUrl: String): Boolean {
+    val uri = runCatching { Uri.parse(rawUrl.trim()) }.getOrNull() ?: return false
+    val scheme = uri.scheme?.lowercase(Locale.ROOT)
+    val host = uri.host?.lowercase(Locale.ROOT) ?: return false
+    val isHttpUrl = scheme == "http" || scheme == "https"
+    val isNaverHost = host == "naver.me" ||
+            host == "naver.com" ||
+            host.endsWith(".naver.com")
+    val hasPathOrQuery = !uri.path.isNullOrBlank() || !uri.query.isNullOrBlank()
+
+    return isHttpUrl && isNaverHost && hasPathOrQuery
 }
 
 @Composable
