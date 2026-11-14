@@ -1,0 +1,45 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    match /users/{uid} {
+      allow read: if signedIn()
+                  && request.auth.uid == uid;
+
+      allow create: if signedIn()
+                    && request.auth.uid == uid
+                    && request.resource.data.keys()
+                       .hasAll(['username', 'email', 'createdAt'])
+                    && request.resource.data.keys()
+                       .hasOnly(['username', 'email', 'createdAt'])
+                    && request.resource.data.username is string
+                    && request.resource.data.username.size() >= 1
+                    && request.resource.data.username.size() <= 30
+                    && request.resource.data.email
+                       == request.auth.token.email
+                    && request.resource.data.createdAt == request.time;
+
+      allow update, delete: if false;
+    }
+
+    match /trips/{tripId} {
+      allow read: if signedIn()
+                  && resource.data.ownerId == request.auth.uid;
+
+      allow write: if false;
+    }
+
+    // 중복 요청 확인 자료는 서버에서만 접근
+    match /requests/{requestId} {
+      allow read, write: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
