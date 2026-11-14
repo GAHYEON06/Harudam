@@ -1,6 +1,7 @@
 package com.example.harudam.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,13 +21,23 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 
 private val ScheduleMint = Color(0xFFA0E8CB)
 private val ScheduleMintLight = Color(0xFFC7F9E5)
@@ -44,11 +55,12 @@ private data class ScheduleDayUi(
 )
 
 private data class SchedulePlaceUi(
+    val id: String,
     val name: String,
     val category: String,
 )
 
-/** Figma screen 3: 여행의 날짜별 일정을 보여주는 정적 UI입니다. */
+/** Figma screen 3: 핸들을 길게 눌러 같은 날짜 안에서 장소 순서를 바꿉니다. */
 @Composable
 fun TripScheduleScreen() {
     val days = listOf(
@@ -56,17 +68,17 @@ fun TripScheduleScreen() {
             1,
             "09.01 (화)",
             listOf(
-                SchedulePlaceUi("초량밀면", "음식·카페"),
-                SchedulePlaceUi("코이", "음식·카페"),
-                SchedulePlaceUi("광안리해수욕장", "관광"),
+                SchedulePlaceUi("day1-place1", "초량밀면", "음식·카페"),
+                SchedulePlaceUi("day1-place2", "코이", "음식·카페"),
+                SchedulePlaceUi("day1-place3", "광안리해수욕장", "관광"),
             ),
         ),
         ScheduleDayUi(
             2,
             "09.02 (수)",
             listOf(
-                SchedulePlaceUi("AREA6", "관광"),
-                SchedulePlaceUi("자매국밥", "음식·카페"),
+                SchedulePlaceUi("day2-place1", "AREA6", "관광"),
+                SchedulePlaceUi("day2-place2", "자매국밥", "음식·카페"),
             ),
         ),
         ScheduleDayUi(3, "09.03 (목)", emptyList()),
@@ -122,6 +134,13 @@ private fun ScheduleHeader() {
 
 @Composable
 private fun ScheduleDayCard(day: ScheduleDayUi) {
+    val places = remember(day.dayNumber) {
+        mutableStateListOf<SchedulePlaceUi>().apply { addAll(day.places) }
+    }
+    var draggedIndex by remember(day.dayNumber) { mutableStateOf<Int?>(null) }
+    var dragOffsetY by remember(day.dayNumber) { mutableStateOf(0f) }
+    val density = LocalDensity.current
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = Color.White,
@@ -156,7 +175,7 @@ private fun ScheduleDayCard(day: ScheduleDayUi) {
             }
 
             Spacer(Modifier.height(9.dp))
-            if (day.places.isEmpty()) {
+            if (places.isEmpty()) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -178,8 +197,51 @@ private fun ScheduleDayCard(day: ScheduleDayUi) {
                 }
             } else {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    day.places.forEachIndexed { index, place ->
-                        SchedulePlaceRow(index + 1, place)
+                    places.forEachIndexed { index, place ->
+                        key(place.id) {
+                            SchedulePlaceRow(
+                                number = index + 1,
+                                place = place,
+                                isDragging = draggedIndex == index,
+                                dragOffsetY = dragOffsetY,
+                                onDragStart = {
+                                    draggedIndex = index
+                                    dragOffsetY = 0f
+                                },
+                                onDragDelta = { deltaY ->
+                                    val currentIndex = draggedIndex
+                                    if (currentIndex != null) {
+                                        val rowStepPx = with(density) { (45.dp + 12.dp).toPx() }
+                                        var remainingOffset = dragOffsetY + deltaY
+                                        var targetIndex = currentIndex
+
+                                        while (
+                                            remainingOffset > rowStepPx / 2f &&
+                                            targetIndex < places.lastIndex
+                                        ) {
+                                            targetIndex += 1
+                                            remainingOffset -= rowStepPx
+                                        }
+                                        while (remainingOffset < -rowStepPx / 2f && targetIndex > 0) {
+                                            targetIndex -= 1
+                                            remainingOffset += rowStepPx
+                                        }
+
+                                        if (targetIndex != currentIndex) {
+                                            val movedPlace = places.removeAt(currentIndex)
+                                            places.add(targetIndex, movedPlace)
+                                            draggedIndex = targetIndex
+                                        }
+
+                                        dragOffsetY = remainingOffset
+                                    }
+                                },
+                                onDragFinished = {
+                                    draggedIndex = null
+                                    dragOffsetY = 0f
+                                },
+                            )
+                        }
                     }
                 }
             }
@@ -188,23 +250,46 @@ private fun ScheduleDayCard(day: ScheduleDayUi) {
 }
 
 @Composable
-private fun SchedulePlaceRow(number: Int, place: SchedulePlaceUi) {
+private fun SchedulePlaceRow(
+    number: Int,
+    place: SchedulePlaceUi,
+    isDragging: Boolean,
+    dragOffsetY: Float,
+    onDragStart: () -> Unit,
+    onDragDelta: (Float) -> Unit,
+    onDragFinished: () -> Unit,
+) {
     Row(
         modifier = Modifier
+            .pointerInput(place.id) {
+                detectDragGesturesAfterLongPress(
+                    onDragStart = {
+                        onDragStart()
+                    },
+                    onDrag = { change, dragAmount ->
+                        change.consume()
+                        onDragDelta(dragAmount.y)
+                    },
+                    onDragEnd = {
+                        onDragFinished()
+                    },
+                    onDragCancel = {
+                        onDragFinished()
+                    },
+                )
+            }
+            .graphicsLayer {
+                translationY = if (isDragging) dragOffsetY else 0f
+                shadowElevation = if (isDragging) 8.dp.toPx() else 0f
+            }
+            .zIndex(if (isDragging) 1f else 0f)
             .fillMaxWidth()
             .height(45.dp)
             .background(ScheduleIvory, RoundedCornerShape(10.dp))
             .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            modifier = Modifier
-                .size(20.dp)
-                .background(ScheduleMintLight, CircleShape),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(number.toString(), color = Color(0xFF4A8C76), fontSize = 12.sp)
-        }
+        PlaceOrderBadge(number)
         Text(
             place.name,
             modifier = Modifier.padding(start = 12.dp).weight(1f),
@@ -214,13 +299,30 @@ private fun SchedulePlaceRow(number: Int, place: SchedulePlaceUi) {
             maxLines = 1,
         )
         ScheduleCategoryChip(place.category)
-        Text(
-            "≡",
-            modifier = Modifier.padding(start = 10.dp),
-            color = ScheduleSubtext,
-            fontSize = 19.sp,
-            lineHeight = 19.sp,
-        )
+        Box(
+            modifier = Modifier
+                .size(width = 28.dp, height = 40.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                "≡",
+                color = ScheduleSubtext,
+                fontSize = 19.sp,
+                lineHeight = 19.sp,
+            )
+        }
+    }
+}
+
+@Composable
+private fun PlaceOrderBadge(number: Int) {
+    Box(
+        modifier = Modifier
+            .size(20.dp)
+            .background(ScheduleMintLight, CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(number.toString(), color = Color(0xFF4A8C76), fontSize = 12.sp)
     }
 }
 

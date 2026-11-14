@@ -212,7 +212,10 @@ fun AppNavGraph() {
             TripInfoInputScreen(
                 onBackClick = {
                     navController.popBackStack()
-                }
+                },
+                onConfirmPlacesClick = {
+                    navController.navigate(Routes.TRIP_SCHEDULE)
+                },
             )
         }
 
