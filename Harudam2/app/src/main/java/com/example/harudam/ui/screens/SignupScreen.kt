@@ -17,8 +17,9 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.harudam.viewmodel.SignUpUiState
+import androidx.compose.ui.tooling.preview.Preview
 
-private val AuthBlue = Color(0xFF4968C8)
+private val AuthBlue = Color(0xFFA0E8CB)
 private val AuthText = Color(0xFF34445E)
 private val AuthMuted = Color(0xFF929BA7)
 private val AuthBorder = Color(0xFFE1E5EA)
@@ -289,6 +290,21 @@ private fun AuthInputField(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(start = 12.dp, top = 4.dp)
+        )
+    }
+}
+
+
+
+@Preview(showBackground = true, widthDp = 360, heightDp = 800)
+@Composable
+private fun SignUpScreenPreview() {
+    MaterialTheme {
+        SignUpScreen(
+            uiState = SignUpUiState(),
+            onEmailChange = {},
+            onPasswordChange = {},
+            onAgreementChange = {},
         )
     }
 }

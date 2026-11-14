@@ -16,11 +16,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.harudam.viewmodel.LoginUiState
 
-private val LoginAccent = Color(0xFF4968C8)
+private val LoginAccent = Color(0xFFA0E8CB)
 private val LoginInk = Color(0xFF34445E)
 private val LoginHint = Color(0xFF9AA3AE)
 private val LoginLine = Color(0xFFE1E5EA)
@@ -239,3 +240,16 @@ private fun loginFieldColors() = OutlinedTextFieldDefaults.colors(
     unfocusedTextColor = LoginInk,
     cursorColor = LoginAccent
 )
+
+@Preview(showBackground = true, widthDp = 360, heightDp = 800)
+@Composable
+private fun LoginScreenPreview() {
+    MaterialTheme {
+        LoginScreen(
+            uiState = LoginUiState(),
+            onEmailChange = {},
+            onPasswordChange = {},
+            onLoginClick = {},
+        )
+    }
+}

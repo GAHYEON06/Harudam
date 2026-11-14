@@ -11,15 +11,19 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.harudam.AuthRepository
-import com.example.harudam.ui.screens.HarudamHomeScreen
+import com.example.harudam.ui.screens.HomeScreen
 import com.example.harudam.ui.screens.LoginScreen
 import com.example.harudam.ui.screens.SignUpScreen
 import com.example.harudam.viewmodel.AuthViewModel
+import com.example.harudam.ui.screens.TripInfoInputScreen
+import com.example.harudam.ui.screens.TripScheduleScreen
 
 private object Routes {
     const val LOGIN = "login"
     const val SIGN_UP = "signup"
     const val HOME = "home"
+    const val CREATE_TRIP = "create_trip"
+    const val TRIP_SCHEDULE = "trip_schedule"
 }
 
 @Composable
@@ -27,6 +31,9 @@ fun AppNavGraph() {
     val navController = rememberNavController()
     val authViewModel: AuthViewModel = viewModel()
     val repository = remember { AuthRepository() }
+    val startDestination = remember {
+        if (repository.isLoggedIn()) Routes.HOME else Routes.LOGIN
+    }
 
     var loading by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
@@ -36,7 +43,7 @@ fun AppNavGraph() {
 
     NavHost(
         navController = navController,
-        startDestination = Routes.LOGIN
+        startDestination = startDestination
     ) {
         composable(Routes.LOGIN) {
             LoginScreen(
@@ -191,39 +198,26 @@ fun AppNavGraph() {
         }
 
         composable(Routes.HOME) {
-            Column(
-                modifier = Modifier.fillMaxSize()
-            ) {
-                TextButton(
-                    onClick = {
-                        repository.logout()
-                        message = null
-
-                        authViewModel.onEmailChange("")
-                        authViewModel.onPasswordChange("")
-                        authViewModel.onSignUpEmailChange("")
-                        authViewModel.onSignUpPasswordChange("")
-                        authViewModel.onAgreementChange(false)
-
-                        navController.navigate(Routes.LOGIN) {
-                            popUpTo(Routes.HOME) {
-                                inclusive = true
-                            }
-                            launchSingleTop = true
-                        }
-                    }
-                ) {
-                    Text("로그아웃")
+            HomeScreen(
+                onAddTripClick = {
+                    navController.navigate(Routes.CREATE_TRIP)
+                },
+                onTripClick = {
+                    navController.navigate(Routes.TRIP_SCHEDULE)
                 }
+            )
+        }
 
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                ) {
-                    HarudamHomeScreen()
+        composable(Routes.CREATE_TRIP) {
+            TripInfoInputScreen(
+                onBackClick = {
+                    navController.popBackStack()
                 }
-            }
+            )
+        }
+
+        composable(Routes.TRIP_SCHEDULE) {
+            TripScheduleScreen()
         }
     }
 }

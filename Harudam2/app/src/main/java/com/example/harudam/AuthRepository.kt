@@ -128,6 +128,7 @@ class AuthRepository {
     fun logout() {
         auth.signOut()
     }
+    fun isLoggedIn(): Boolean = auth.currentUser != null
 
     private fun errorMessage(error: Exception): String =
         when (error) {

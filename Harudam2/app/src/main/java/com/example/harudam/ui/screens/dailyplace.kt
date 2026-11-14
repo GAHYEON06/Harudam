@@ -9,9 +9,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -28,148 +28,158 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-private val DayScreenNavy = Color(0xFF294577)
-private val DayScreenBlue = Color(0xFF496AA5)
-private val DayScreenPaleBlue = Color(0xFFEEF3FB)
-private val DayScreenText = Color(0xFF252B36)
-private val DayScreenSubtext = Color(0xFF788397)
-private val DayScreenBorder = Color(0xFFE1E6EE)
-private val DayScreenBackground = Color(0xFFF7F8FA)
+private val ScheduleMint = Color(0xFFA0E8CB)
+private val ScheduleMintLight = Color(0xFFC7F9E5)
+private val ScheduleIvory = Color(0xFFFBF9F4)
+private val ScheduleText = Color(0xFF554239)
+private val ScheduleSubtext = Color(0xFF7D6A60)
+private val ScheduleBorder = Color(0xFFECE5DC)
+private val FoodOrange = Color(0xFFEE8A5F)
+private val TourBlue = Color(0xFF4C9BC4)
 
-private data class DayPlacesPreview(
-    val day: Int,
-    val places: List<String>,
+private data class ScheduleDayUi(
+    val dayNumber: Int,
+    val dateLabel: String,
+    val places: List<SchedulePlaceUi>,
 )
 
-/** 날짜별로 배정된 장소 목록을 보여주는 정적 UI 초안입니다. */
+private data class SchedulePlaceUi(
+    val name: String,
+    val category: String,
+)
+
+/** Figma screen 3: 여행의 날짜별 일정을 보여주는 정적 UI입니다. */
 @Composable
-fun DatePlaceSelectionScreen() {
-    val dayGroups = listOf(
-        DayPlacesPreview(1, listOf("봉어당", "면식당")),
-        DayPlacesPreview(2, listOf("슬로우브랜드", "광안리 해변")),
-        DayPlacesPreview(3, emptyList()),
+fun TripScheduleScreen() {
+    val days = listOf(
+        ScheduleDayUi(
+            1,
+            "09.01 (화)",
+            listOf(
+                SchedulePlaceUi("초량밀면", "음식·카페"),
+                SchedulePlaceUi("코이", "음식·카페"),
+                SchedulePlaceUi("광안리해수욕장", "관광"),
+            ),
+        ),
+        ScheduleDayUi(
+            2,
+            "09.02 (수)",
+            listOf(
+                SchedulePlaceUi("AREA6", "관광"),
+                SchedulePlaceUi("자매국밥", "음식·카페"),
+            ),
+        ),
+        ScheduleDayUi(3, "09.03 (목)", emptyList()),
     )
 
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = DayScreenBackground,
-    ) {
+    Surface(modifier = Modifier.fillMaxSize(), color = ScheduleIvory) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp)
-                .padding(top = 18.dp, bottom = 24.dp),
+                .verticalScroll(rememberScrollState()),
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .background(Color.White, CircleShape),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text("‹", color = DayScreenNavy, fontSize = 30.sp)
-                }
-                Column(modifier = Modifier.padding(start = 12.dp)) {
-                    Text(
-                        text = "부산여행",
-                        color = DayScreenText,
-                        fontSize = 21.sp,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    Spacer(Modifier.height(3.dp))
-                    Text(
-                        text = "2026.09.01 ~ 2026.09.03",
-                        color = DayScreenSubtext,
-                        fontSize = 13.sp,
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(24.dp))
-
-            dayGroups.forEach { group ->
-                DayPlaceGroup(group)
-                Spacer(Modifier.height(18.dp))
-            }
-
-            Box(
+            ScheduleHeader()
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(54.dp)
-                    .background(DayScreenNavy, RoundedCornerShape(14.dp)),
-                contentAlignment = Alignment.Center,
+                    .padding(horizontal = 21.dp)
+                    .offset(y = (-40).dp),
+                verticalArrangement = Arrangement.spacedBy(20.dp),
             ) {
-                Text(
-                    text = "확정하기",
-                    color = Color.White,
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.SemiBold,
-                )
+                days.forEach { day -> ScheduleDayCard(day) }
             }
         }
     }
 }
 
 @Composable
-private fun DayPlaceGroup(group: DayPlacesPreview) {
-    Column {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
+private fun ScheduleHeader() {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(161.dp)
+            .background(ScheduleMint, RoundedCornerShape(bottomStart = 10.dp, bottomEnd = 10.dp))
+            .padding(start = 16.dp, end = 20.dp, top = 32.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("‹", color = ScheduleText, fontSize = 27.sp, lineHeight = 27.sp)
             Text(
-                text = "${group.day}일차",
-                color = DayScreenText,
-                fontSize = 19.sp,
-                fontWeight = FontWeight.SemiBold,
+                "일정 정리",
+                modifier = Modifier.padding(start = 9.dp),
+                color = ScheduleText,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
             )
-            Surface(
-                color = DayScreenPaleBlue,
-                shape = RoundedCornerShape(9.dp),
+        }
+        Text(
+            text = "부산여행 | 2026.09.01 ~ 09.05",
+            modifier = Modifier.padding(start = 25.dp, top = 7.dp),
+            color = ScheduleText,
+            fontSize = 14.sp,
+        )
+    }
+}
+
+@Composable
+private fun ScheduleDayCard(day: ScheduleDayUi) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = Color.White,
+        shape = RoundedCornerShape(10.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, ScheduleBorder),
+        shadowElevation = 3.dp,
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 21.dp, vertical = 10.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = "추가하기",
-                    modifier = Modifier.padding(horizontal = 13.dp, vertical = 8.dp),
-                    color = DayScreenBlue,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Medium,
+                    "${day.dayNumber}일차",
+                    color = ScheduleText,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
                 )
+                Text(
+                    day.dateLabel,
+                    modifier = Modifier.padding(start = 10.dp).weight(1f),
+                    color = ScheduleSubtext,
+                    fontSize = 12.sp,
+                )
+                Box(
+                    modifier = Modifier
+                        .background(ScheduleMintLight, RoundedCornerShape(10.dp))
+                        .padding(horizontal = 12.dp, vertical = 7.dp),
+                ) {
+                    Text("+ 추가", color = ScheduleText, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                }
             }
-        }
 
-        Spacer(Modifier.height(9.dp))
-
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            color = Color.White,
-            shape = RoundedCornerShape(14.dp),
-            border = androidx.compose.foundation.BorderStroke(1.dp, DayScreenBorder),
-        ) {
-            if (group.places.isEmpty()) {
+            Spacer(Modifier.height(9.dp))
+            if (day.places.isEmpty()) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(78.dp),
+                        .height(45.dp)
+                        .background(Color.White, RoundedCornerShape(10.dp))
+                        .padding(1.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(
-                        text = "아직 담은 장소가 없습니다",
-                        color = DayScreenSubtext,
-                        fontSize = 14.sp,
-                    )
+                    Surface(
+                        modifier = Modifier.fillMaxSize(),
+                        color = Color.White,
+                        shape = RoundedCornerShape(10.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, ScheduleBorder),
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text("아직 장소가 없어요", color = ScheduleSubtext, fontSize = 12.sp)
+                        }
+                    }
                 }
             } else {
-                Column(
-                    modifier = Modifier.padding(10.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    group.places.forEachIndexed { index, place ->
-                        DayPlaceRow(number = index + 1, name = place)
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    day.places.forEachIndexed { index, place ->
+                        SchedulePlaceRow(index + 1, place)
                     }
                 }
             }
@@ -178,35 +188,62 @@ private fun DayPlaceGroup(group: DayPlacesPreview) {
 }
 
 @Composable
-private fun DayPlaceRow(number: Int, name: String) {
+private fun SchedulePlaceRow(number: Int, place: SchedulePlaceUi) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color(0xFFFAFBFD), RoundedCornerShape(9.dp))
-            .padding(start = 10.dp, top = 8.dp, end = 8.dp, bottom = 8.dp),
+            .height(45.dp)
+            .background(ScheduleIvory, RoundedCornerShape(10.dp))
+            .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        Box(
+            modifier = Modifier
+                .size(20.dp)
+                .background(ScheduleMintLight, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(number.toString(), color = Color(0xFF4A8C76), fontSize = 12.sp)
+        }
         Text(
-            text = number.toString(),
-            color = DayScreenBlue,
+            place.name,
+            modifier = Modifier.padding(start = 12.dp).weight(1f),
+            color = ScheduleText,
             fontSize = 14.sp,
-            fontWeight = FontWeight.Medium,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
         )
-        Spacer(Modifier.width(12.dp))
+        ScheduleCategoryChip(place.category)
         Text(
-            text = name,
-            modifier = Modifier.weight(1f),
-            color = DayScreenText,
-            fontSize = 14.sp,
+            "≡",
+            modifier = Modifier.padding(start = 10.dp),
+            color = ScheduleSubtext,
+            fontSize = 19.sp,
+            lineHeight = 19.sp,
         )
-        Text("×", color = DayScreenSubtext, fontSize = 20.sp)
     }
 }
 
-@Preview(showBackground = true)
 @Composable
-private fun DatePlaceSelectionScreenPreview() {
-    MaterialTheme {
-        DatePlaceSelectionScreen()
+private fun ScheduleCategoryChip(category: String) {
+    val dotColor = if (category == "관광") TourBlue else FoodOrange
+    Surface(
+        color = Color.White,
+        shape = CircleShape,
+        border = androidx.compose.foundation.BorderStroke(1.dp, ScheduleBorder),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(Modifier.size(6.dp).background(dotColor, CircleShape))
+            Text(category, modifier = Modifier.padding(start = 5.dp), color = ScheduleText, fontSize = 11.sp)
+        }
     }
+}
+
+@Preview(showBackground = true, widthDp = 360, heightDp = 800)
+@Composable
+private fun TripScheduleScreenPreview() {
+    MaterialTheme { TripScheduleScreen() }
 }
