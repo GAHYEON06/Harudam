@@ -8,10 +8,18 @@ import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import com.example.harudam.navigation.AppNavGraph
 import com.example.harudam.ui.theme.HarudamTheme
+import androidx.activity.SystemBarStyle
+import androidx.activity.enableEdgeToEdge
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.light(
+                android.graphics.Color.TRANSPARENT,
+                android.graphics.Color.TRANSPARENT,
+            ),
+        )
 
         setContent {
             HarudamTheme {

@@ -294,16 +294,14 @@ private fun CreateTripForm(
     ) {
         Column(modifier = Modifier.padding(horizontal = 17.dp, vertical = 12.dp)) {
             FormLabel("여행 이름")
-            Spacer(Modifier.height(5.dp))
+            Spacer(Modifier.height(3.dp))
             OutlinedTextField(
                 value = tripName,
                 onValueChange = onTripNameChange,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(43.dp),
+                modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 placeholder = {
-                    Text("여행 이름 입력", color = CreateSubtext, fontSize = 14.sp)
+                    Text("여행 이름 입력", color = CreateSubtext, fontSize = 12.sp)
                 },
                 textStyle = TextStyle(
                     color = CreateText,
@@ -407,7 +405,7 @@ private fun CreateTripForm(
                             text = if (placesEnabled) {
                                 "지도 목록 링크를 붙여넣으세요"
                             } else {
-                                "여행 이름과 날짜를 먼저 입력해 주세요"
+                                "여행 이름과 날짜를 먼저 입력"
                             },
                             color = CreateSubtext,
                             fontSize = 12.sp,
@@ -435,7 +433,7 @@ private fun CreateTripForm(
                 val canAddUrl = placesEnabled && placeListUrl.isNotBlank()
                 Surface(
                     modifier = Modifier
-                        .size(width = 58.dp, height = 43.dp)
+                        .size(width = 58.dp, height = 52.dp)
                         .clickable(
                             enabled = canAddUrl,
                             onClick = { onAddUrlClick(placeListUrl.trim()) },
@@ -569,23 +567,13 @@ private fun CreateMapPlaceholder(places: List<ImportedPlaceUi>) {
             } else {
                 Column(
                     modifier = Modifier
+                        .fillMaxWidth()
                         .fillMaxSize()
                         .padding(horizontal = 20.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(38.dp)
-                            .background(CreateMintLight, CircleShape),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            text = "⌖",
-                            color = CreateText,
-                            fontSize = 24.sp,
-                        )
-                    }
+
                     Spacer(Modifier.height(9.dp))
                     Text(
                         text = "지도에 표시할 장소가 없어요",

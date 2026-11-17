@@ -204,7 +204,24 @@ fun AppNavGraph() {
                 },
                 onTripClick = {
                     navController.navigate(Routes.TRIP_SCHEDULE)
-                }
+                },
+                onLogoutClick = {
+                    repository.logout()
+                    message = null
+
+                    authViewModel.onEmailChange("")
+                    authViewModel.onPasswordChange("")
+                    authViewModel.onSignUpEmailChange("")
+                    authViewModel.onSignUpPasswordChange("")
+                    authViewModel.onAgreementChange(false)
+
+                    navController.navigate(Routes.LOGIN) {
+                        popUpTo(Routes.HOME) {
+                            inclusive = true
+                        }
+                        launchSingleTop = true
+                    }
+                },
             )
         }
 
@@ -220,7 +237,11 @@ fun AppNavGraph() {
         }
 
         composable(Routes.TRIP_SCHEDULE) {
-            TripScheduleScreen()
+            TripScheduleScreen(
+                onBackClick = {
+                    navController.popBackStack()
+                }
+            )
         }
     }
 }

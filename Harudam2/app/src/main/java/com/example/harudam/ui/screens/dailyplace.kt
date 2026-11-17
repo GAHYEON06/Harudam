@@ -1,6 +1,7 @@
 package com.example.harudam.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -62,7 +63,7 @@ private data class SchedulePlaceUi(
 
 /** Figma screen 3: 핸들을 길게 눌러 같은 날짜 안에서 장소 순서를 바꿉니다. */
 @Composable
-fun TripScheduleScreen() {
+fun TripScheduleScreen(onBackClick: () -> Unit = {}) {
     val days = listOf(
         ScheduleDayUi(
             1,
@@ -90,7 +91,7 @@ fun TripScheduleScreen() {
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState()),
         ) {
-            ScheduleHeader()
+            ScheduleHeader(onBackClick = onBackClick)
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -105,7 +106,7 @@ fun TripScheduleScreen() {
 }
 
 @Composable
-private fun ScheduleHeader() {
+private fun ScheduleHeader(onBackClick: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -114,7 +115,13 @@ private fun ScheduleHeader() {
             .padding(start = 16.dp, end = 20.dp, top = 32.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("‹", color = ScheduleText, fontSize = 27.sp, lineHeight = 27.sp)
+            Text(
+                text = "‹",
+                modifier = Modifier.clickable(onClick = onBackClick),
+                color = ScheduleText,
+                fontSize = 27.sp,
+                lineHeight = 27.sp,
+            )
             Text(
                 "일정 정리",
                 modifier = Modifier.padding(start = 9.dp),
@@ -128,6 +135,12 @@ private fun ScheduleHeader() {
             modifier = Modifier.padding(start = 25.dp, top = 7.dp),
             color = ScheduleText,
             fontSize = 14.sp,
+        )
+        Text(
+            text = "장소 카드를 길게 눌러 드래그해 순서를 바꿀 수 있어요",
+            modifier = Modifier.padding(start = 10.dp, top = 8.dp),
+            color = ScheduleSubtext,
+            fontSize = 12.sp,
         )
     }
 }
