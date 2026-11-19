@@ -1,0 +1,9 @@
+*.log
+**/node_modules/
+**/.gradle/
+**/.kotlin/
+**/build/
+**/local.properties
+firebase-projects-result.json
+functions-status.json
+billing-status.json

@@ -7,7 +7,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -37,6 +37,15 @@ fun SignUpScreen(
     isLoading: Boolean = false,
     message: String? = null,
 ) {
+    var showPrivacy by remember { mutableStateOf(false) }
+    if (showPrivacy) {
+        AlertDialog(
+            onDismissRequest = { showPrivacy = false },
+            title = { Text("데이터 이용 안내") },
+            text = { Text("이메일과 사용자 이름은 회원 식별에, 여행명·날짜·장소·메모는 일정 저장에 사용합니다. 비밀번호는 Firebase Authentication에서 관리합니다. 여행 삭제 기능으로 여행 데이터를 지울 수 있습니다. 지도 열기와 공유는 선택한 외부 앱으로 정보를 전달합니다. 이 안내는 개발용 기능 안내이며, 정식 배포 전 운영자의 개인정보 처리방침을 제공해야 합니다.") },
+            confirmButton = { TextButton(onClick = { showPrivacy = false }) { Text("확인") } }
+        )
+    }
     BackHandler {
         if (!isLoading) {
             onBackClick()
@@ -132,7 +141,7 @@ fun SignUpScreen(
                         // 약관 내용 화면은 추후 연결
                         TextButton(
                             enabled = !isLoading,
-                            onClick = {}
+                            onClick = { showPrivacy = true }
                         ) {
                             Text("보기", color = AuthBlue)
                         }

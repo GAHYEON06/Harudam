@@ -7,6 +7,7 @@ import com.google.firebase.auth.FirebaseAuthInvalidUserException
 import com.google.firebase.auth.FirebaseAuthUserCollisionException
 import com.google.firebase.auth.FirebaseAuthWeakPasswordException
 import com.google.firebase.auth.FirebaseUser
+import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.UserProfileChangeRequest
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
@@ -127,6 +128,25 @@ class AuthRepository {
 
     fun logout() {
         auth.signOut()
+    }
+
+    fun resetPassword(email: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
+        auth.sendPasswordResetEmail(email.trim())
+            .addOnSuccessListener { onSuccess() }
+            .addOnFailureListener { onError(errorMessage(it)) }
+    }
+
+    fun loginWithGoogle(token: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
+        auth.signInWithCredential(GoogleAuthProvider.getCredential(token, null))
+            .addOnSuccessListener { result ->
+                val user = result.user
+                if (user == null) { onError("로그인 결과를 확인하지 못했어요."); return@addOnSuccessListener }
+                ensureProfile(user, onSuccess) {
+                    auth.signOut()
+                    onError("사용자 정보를 저장하지 못했어요. 연결을 확인하고 다시 시도해 주세요.")
+                }
+            }
+            .addOnFailureListener { onError(errorMessage(it)) }
     }
 
     private fun errorMessage(error: Exception): String =

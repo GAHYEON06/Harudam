@@ -34,6 +34,7 @@ fun LoginScreen(
     onLoginClick: () -> Unit,
     onGoogleLoginClick: () -> Unit = {},
     onSignUpClick: () -> Unit = {},
+    onResetPasswordClick: () -> Unit = {},
     isLoading: Boolean = false,
     message: String? = null,
 ) {
@@ -165,6 +166,9 @@ fun LoginScreen(
                 )
             }
 
+            TextButton(enabled = !isLoading, onClick = onResetPasswordClick) {
+                Text("비밀번호 재설정", color = LoginAccent)
+            }
             Spacer(Modifier.height(23.dp))
 
             Row(verticalAlignment = Alignment.CenterVertically) {

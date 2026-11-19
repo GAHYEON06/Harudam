@@ -39,7 +39,7 @@ async function call(token, data) {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: JSON.stringify({ data }),
   });
@@ -70,6 +70,10 @@ async function main() {
   const userA = await makeUser();
   const userB = await makeUser();
 
+  await assert.rejects(() => call(null, { action: "listTrips" }),
+    (error) => error.code === "UNAUTHENTICATED");
+  console.log("통과: 비로그인 요청 차단");
+
   const creation = {
     action: "createTrip",
     requestId: randomUUID(),
@@ -89,6 +93,12 @@ async function main() {
   assert.equal(repeated.version, version);
 
   console.log("통과: 같은 요청 재전송 시 중복 생성 방지");
+
+  const reordered = Object.fromEntries(Object.entries(creation).reverse());
+  assert.deepEqual(await call(userA, reordered), repeated);
+  await assert.rejects(() => call(userA, { ...creation, title: "변경된 요청" }),
+    (error) => error.code === "ALREADY_EXISTS");
+  console.log("통과: 키 순서가 다른 재전송과 같은 ID의 다른 내용 구분");
 
   await assert.rejects(
     () => call(userB, { action: "getTrip", tripId }),
@@ -216,6 +226,87 @@ async function main() {
   assert.ok(list.trips.some((item) => item.id === tripId));
 
   console.log("통과: 내 여행 목록 조회");
+
+  const baseVersion = version;
+  const concurrent = await Promise.allSettled([
+    call(userA, write("updateTrip", tripId, baseVersion, { title: "동시 수정 A" })),
+    call(userA, write("updateTrip", tripId, baseVersion, { title: "동시 수정 B" })),
+  ]);
+  assert.equal(concurrent.filter((x) => x.status === "fulfilled").length, 1);
+  assert.equal(concurrent.filter((x) => x.status === "rejected" && x.reason.code === "ABORTED").length, 1);
+  version = concurrent.find((x) => x.status === "fulfilled").value.version;
+  console.log("통과: 실제 동시 수정 1건만 성공");
+
+  await assert.rejects(() => call(userA, write("setSchedule", tripId, version, {
+    placeId: foodId, visitDate: "2026-12-01", visitTime: "25:90",
+  })), (error) => error.code === "INVALID_ARGUMENT");
+  result = await call(userA, write("setSchedule", tripId, version, {
+    placeId: foodId, visitDate: "2026-12-01", visitTime: "12:30", note: "점심 메모",
+  }));
+  version = result.version;
+  trip = await call(userA, { action: "getTrip", tripId });
+  assert.equal(trip.schedules["2026-12-01"][0].visitTime, "12:30");
+  assert.equal(trip.schedules["2026-12-01"][0].note, "점심 메모");
+
+  result = await call(userA, write("setSchedule", tripId, version, {
+    placeId: beachId, visitDate: "2026-12-01",
+  }));
+  version = result.version;
+  result = await call(userA, write("setSchedule", tripId, version, {
+    placeId: foodId, visitDate: "2026-12-01", note: "메모만 수정",
+  }));
+  version = result.version;
+  trip = await call(userA, { action: "getTrip", tripId });
+  assert.deepEqual(trip.schedules["2026-12-01"].map((p) => p.id), [foodId, beachId]);
+  assert.equal(trip.schedules["2026-12-01"][0].visitTime, "12:30");
+  console.log("통과: 시간 검증, 메모 저장, 메모 수정 시 순서 유지");
+
+  result = await call(userA, write("updatePlace", tripId, version, {
+    placeId: foodId, name: "수정한 식당", sourceUrl: "https://example.com/place",
+  }));
+  version = result.version;
+  trip = await call(userA, { action: "getTrip", tripId });
+  assert.equal(trip.places.find((p) => p.id === foodId).name, "수정한 식당");
+  assert.equal(trip.placesConfirmed, false);
+  await assert.rejects(() => call(userB, write("deleteTrip", tripId, version)),
+    (error) => error.code === "PERMISSION_DENIED");
+  result = await call(userA, write("removeSchedule", tripId, version, { placeId: foodId }));
+  version = result.version;
+  trip = await call(userA, { action: "getTrip", tripId });
+  assert.equal(trip.unscheduledPlaces.some((p) => p.id === foodId), true);
+  assert.equal(trip.schedules["2026-12-01"][0].visitOrder, 1);
+  result = await call(userA, write("deletePlace", tripId, version, { placeId: beachId }));
+  version = result.version;
+  console.log("통과: 장소 수정, 일정 취소, 장소 삭제, 비소유자 변경 차단");
+
+  const documentUrl = `http://127.0.0.1:8080/v1/projects/${projectId}/databases/(default)/documents/trips/${tripId}`;
+  for (const [token, expected] of [[userA, 200], [userB, 403], [null, 403]]) {
+    const response = await fetch(documentUrl, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+    assert.equal(response.status, expected);
+  }
+  const directWrite = await fetch(documentUrl, {
+    method: "PATCH", headers: { Authorization: `Bearer ${userA}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ fields: { ownerId: { stringValue: "forged" } } }),
+  });
+  assert.equal(directWrite.status, 403);
+  console.log("통과: Firestore 규칙의 소유자 읽기, 비참여자 차단, 직접 쓰기 차단");
+
+  const identity = JSON.parse(Buffer.from(userA.split(".")[1], "base64url").toString());
+  const uid = identity.sub;
+  const profilePath = `projects/${projectId}/databases/(default)/documents/users/${uid}`;
+  const commitUrl = `http://127.0.0.1:8080/v1/projects/${projectId}/databases/(default)/documents:commit`;
+  const profile = await fetch(commitUrl, {
+    method: "POST", headers: { Authorization: `Bearer ${userA}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ writes: [{
+      update: { name: profilePath, fields: { username: { stringValue: "여행자" }, email: { stringValue: identity.email } } },
+      updateTransforms: [{ fieldPath: "createdAt", setToServerValue: "REQUEST_TIME" }],
+    }] }),
+  });
+  assert.equal(profile.status, 200, await profile.text());
+  const profileUrl = `http://127.0.0.1:8080/v1/${profilePath}`;
+  assert.equal((await fetch(profileUrl, { headers: { Authorization: `Bearer ${userA}` } })).status, 200);
+  assert.equal((await fetch(profileUrl, { headers: { Authorization: `Bearer ${userB}` } })).status, 403);
+  console.log("통과: 회원가입 프로필 생성 규칙과 본인만 조회");
 
   await call(
     userA,
