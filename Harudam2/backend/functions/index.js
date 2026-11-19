@@ -228,6 +228,23 @@ function compactOrders(trip) {
   }
 }
 
+function visitTime(value) {
+  if (value === null || value === undefined || value === "") return null;
+  if (typeof value !== "string" || !/^([01]\d|2[0-3]):[0-5]\d$/.test(value)) {
+    fail("invalid-argument", "방문 시간은 HH:mm 형식으로 입력해 주세요.");
+  }
+  return value;
+}
+
+// Key order does not change the meaning of a retried JSON request.
+function canonicalJson(value) {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (value && typeof value === "object") {
+    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
 function summary(id, trip) {
   const days =
     Math.round(
@@ -374,7 +391,7 @@ exports.travelApi = onCall(
       .digest("hex");
 
     const payloadHash = createHash("sha256")
-      .update(JSON.stringify(data))
+      .update(canonicalJson(data))
       .digest("hex");
 
     const requestRef = db.collection("requests").doc(requestKey);
@@ -494,6 +511,7 @@ exports.travelApi = onCall(
               ...normalizePlace(data),
               visitDate: null,
               visitOrder: null,
+              visitTime: null,
               note: "",
             });
 
@@ -553,6 +571,17 @@ exports.travelApi = onCall(
               ? place.note
               : text(data.note, "메모", 1000, true);
 
+            const time = data.visitTime === undefined
+              ? (place.visitTime ?? null)
+              : visitTime(data.visitTime);
+
+            // Editing a memo/time must not silently move the place to the end.
+            if (place.visitDate === visitDate) {
+              place.note = note;
+              place.visitTime = time;
+              break;
+            }
+
             // 이동 전 위치에서 먼저 제거
             place.visitDate = null;
             place.visitOrder = null;
@@ -566,6 +595,7 @@ exports.travelApi = onCall(
             place.visitDate = visitDate;
             place.visitOrder = target.length + 1;
             place.note = note;
+            place.visitTime = time;
             break;
           }
 
