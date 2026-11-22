@@ -1,5 +1,6 @@
 const assert = require("node:assert/strict");
 const { randomUUID } = require("node:crypto");
+const { parsePlaces } = require("./parse-places");
 
 const projectId = process.env.TEST_PROJECT_ID;
 
@@ -74,6 +75,17 @@ async function main() {
     (error) => error.code === "UNAUTHENTICATED");
   console.log("통과: 비로그인 요청 차단");
 
+  await assert.rejects(() => call(null, { action: "parsePlaces", url: "https://naver.me/example" }),
+    (error) => error.code === "UNAUTHENTICATED");
+  await assert.rejects(() => call(userA, { action: "parsePlaces", urls: [] }),
+    (error) => error.code === "INVALID_ARGUMENT");
+  const preview = await call(userA, { action: "parsePlaces", urls: ["https://example.com", "http://127.0.0.1"] });
+  assert.equal(preview.errorCount, 2);
+  assert.equal(preview.successCount, 0);
+  assert.ok(preview.results.every((r) => r.status === "error"));
+  assert.equal((await call(userA, { action: "listTrips" })).trips.length, 0);
+  console.log("통과: parsePlaces 인증, 입력 검증, 부분 오류, 자동 저장 없음");
+
   const creation = {
     action: "createTrip",
     requestId: randomUUID(),
@@ -132,16 +144,30 @@ async function main() {
   const beachId = result.placeId;
   version = result.version;
 
+  // Provider HTML is deterministic here; persistence still uses real emulated Callable + Firestore.
+  const parsedFood = await parsePlaces({ url: "https://m.place.naver.com/restaurant/13572738/home" }, {
+    fetchImpl: async () => new Response('<script type="application/ld+json">' + JSON.stringify({
+      "@type": "Restaurant", name: "초량밀면", address: "부산 동구 중앙대로 225",
+      geo: { latitude: 35.115, longitude: 129.04 },
+    }) + '</script>', { headers: { "content-type": "text/html" } }),
+  });
+  assert.equal(parsedFood.successCount, 1);
+
   result = await call(
     userA,
     write("addPlace", tripId, version, {
-      name: "초량밀면",
-      category: "FOOD",
+      ...parsedFood.results[0].place,
     })
   );
 
   const foodId = result.placeId;
   version = result.version;
+
+  const savedFood = (await call(userA, { action: "getTrip", tripId })).places.find((p) => p.id === foodId);
+  for (const key of ["name", "address", "category", "sourceUrl", "latitude", "longitude"]) {
+    assert.equal(savedFood[key], parsedFood.results[0].place[key]);
+  }
+  console.log("통과: 파싱 fixture 결과를 기존 addPlace로 저장·재조회");
 
   console.log("통과: 장소 두 개 추가");
 

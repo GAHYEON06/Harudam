@@ -5,6 +5,7 @@ const {
 } = require("firebase-admin/firestore");
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { createHash, randomUUID } = require("node:crypto");
+const { parsePlaces } = require("./parse-places");
 
 initializeApp();
 
@@ -330,6 +331,11 @@ exports.travelApi = onCall(
     }
 
     const action = text(data.action, "작업 이름", 40);
+
+    // Preview only: authentication is required; writes keep the existing transaction path.
+    if (action === "parsePlaces") {
+      return parsePlaces(data);
+    }
 
     // 여행 목록: 한 번에 최대 50개
     if (action === "listTrips") {
