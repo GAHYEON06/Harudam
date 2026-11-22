@@ -82,11 +82,15 @@
 
 ## 추출과 저장
 
-허용 호스트는 `naver.me`, `map.naver.com`, `m.map.naver.com`, `place.naver.com`, `m.place.naver.com`, `pcmap.place.naver.com`입니다. HTTP 공유 링크는 HTTPS로 올리고 이동할 때마다 호스트를 다시 검사합니다. 개별 장소 경로 또는 숫자 `id` 쿼리를 식별하며 장소 ID만으로 이름을 만들지 않습니다.
+허용 호스트는 `naver.me`, `map.naver.com`, `m.map.naver.com`, `place.naver.com`, `m.place.naver.com`, `pcmap.place.naver.com`입니다. HTTP 공유 링크는 HTTPS로 올리고 이동할 때마다 호스트를 다시 검사합니다. 개별 장소 경로를 식별하며 장소 ID만으로 이름을 만들지 않습니다. 이전 형식의 `m.map.naver.com/search2/site.naver?code={숫자}`와 `map.naver.com/local/siteview.nhn?code={숫자}`도 식별합니다. `id` 쿼리는 `/` 또는 `/index.nhn`에서만 허용하므로 임의 목록 URL에 `id`를 붙여도 개별 장소로 인정하지 않습니다. `naver.me`는 이동한 실제 지도 URL에서 장소를 식별합니다.
 
 공개 HTML의 JSON-LD에서 이름·주소·유형·위경도를 읽고, JSON-LD 이름이 없으면 `og:title`을 확인합니다. [Schema.org LocalBusiness](https://schema.org/LocalBusiness)의 주소와 좌표 구조를 따릅니다. 데스크톱 `map.naver.com/p/entry/place/{id}`가 빈 화면 틀만 제공하면 공개 모바일 장소 페이지를 한 번 조회합니다. 로그인, 브라우저 실행, 비공개 API 호출, 접근 제한 우회는 하지 않습니다.
 
 주소를 확인하지 못하면 `""`, 좌표 중 하나라도 유효하지 않으면 둘 다 `null`, 유형을 확정하지 못하면 `OTHER`를 반환합니다. 경고 코드는 `ADDRESS_UNAVAILABLE`, `COORDINATES_UNAVAILABLE`, `CATEGORY_UNCONFIRMED`입니다. 이름만 추출되어도 `success`일 수 있으므로 저장 전에 사용자 확인이 필요합니다.
+
+좌표는 실제 숫자 또는 십진수 문자열만 허용합니다. `false`, `true`, 배열, 객체, 공백 문자열을 0이나 1로 변환하지 않습니다. 위도·경도 중 하나가 잘못되면 둘 다 `null`입니다. 실제 좌표 0은 유효합니다.
+
+JSON-LD 유형은 정확한 지원 유형 이름 또는 `https://schema.org/Restaurant` 같은 표준 URL 형식으로 검사하며 `NotAPlace`처럼 이름 일부만 겹치는 유형은 인정하지 않습니다. 여러 JSON-LD 블록에 장소가 있으면 `url` 또는 `@id`의 네이버 장소 ID가 현재 페이지와 일치하는 항목을 우선합니다. 다른 장소 ID를 명시한 항목은 이름·주소·좌표 추출에 사용하지 않습니다. 이 검증을 통과해도 사용자 확인은 필요합니다.
 
 파싱은 Firestore를 변경하지 않습니다. 결과의 `place`를 확인·수정한 다음 기존 저장 동작에 전달합니다.
 
@@ -118,4 +122,6 @@ $env:TEST_PROJECT_ID='demo-harudam-parser'
 firebase emulators:exec --project demo-harudam-parser --only auth,firestore,functions "node functions/testbackend.js"
 ```
 
-파서 단위 테스트는 합성 HTML과 모의 네트워크를 사용합니다. 통합 테스트의 성공 파싱 결과 역시 합성 HTML이며, 그 결과의 저장·재조회는 실제 로컬 Functions와 Firestore를 사용합니다. 운영 배포 및 실제 네이버 추출 성공과 구분해야 합니다.
+`test:parser`는 파서 24개와 실제 내보낸 `travelApi` 처리 함수 시험 5개, 총 29개를 실행합니다. 합성 HTML과 모의 네트워크를 사용하며, 파싱 미리보기가 Firestore에 접근하지 않는 것도 확인합니다. 처리 함수 시험은 `.run()`을 호출하므로 HTTP 전송과 토큰 검증 시험은 Firebase Emulator가 담당합니다.
+
+통합 테스트의 성공 파싱 결과 역시 합성 HTML이며, 그 결과의 저장·재조회는 실제 로컬 Functions와 Firestore를 사용합니다. 운영 배포 및 실제 네이버 추출 성공과 구분해야 합니다. `*.test.js` 파일은 Firebase 함수 배포 대상에서 제외했습니다.

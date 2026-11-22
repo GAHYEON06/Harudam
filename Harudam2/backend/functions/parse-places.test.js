@@ -130,3 +130,64 @@ test("at most two fetches run together", async () => {
   assert.equal(r.successCount, 10);
   assert.equal(peak, 2);
 });
+
+test("boolean, blank, array and object coordinates are never coerced into numbers", async () => {
+  for (const value of [true, false, " ", [], [35], {}, "0x23", "Infinity"]) {
+    const r = await run({ url }, async () => page(html({ ...entity, geo: { latitude: value, longitude: "129.1" } })));
+    assert.equal(r.results[0].place.latitude, null, JSON.stringify(value));
+    assert.equal(r.results[0].place.longitude, null);
+  }
+});
+
+test("schema type must be an exact supported type, not a substring", async () => {
+  const r = await run({ url }, async () => page(html({ ...entity, "@type": "NotAPlace" })));
+  assert.equal(r.results[0].error.code, "METADATA_UNAVAILABLE");
+});
+
+test("schema URL matching target place takes priority over unrelated graph nodes", async () => {
+  const r = await run({ url }, async () => page(html({ "@graph": [
+    { ...entity, name: "다른 식당", url: "https://m.place.naver.com/restaurant/999/home" },
+    { ...entity, name: "일치하는 식당", url: "https://m.place.naver.com/restaurant/123/home" },
+  ] })));
+  assert.equal(r.results[0].place.name, "일치하는 식당");
+});
+
+test("schema explicitly identifying another place is not imported", async () => {
+  const r = await run({ url }, async () => page(html({ ...entity, url: "https://m.place.naver.com/restaurant/999/home" })));
+  assert.equal(r.results[0].error.code, "METADATA_UNAVAILABLE");
+});
+
+test("standard schema type URL and array are supported", async () => {
+  const r = await run({ url }, async () => page(html({ ...entity, "@type": ["https://schema.org/Restaurant", "LocalBusiness"] })));
+  assert.equal(r.results[0].place.category, "FOOD");
+});
+
+test("matching schema in a later script wins over an unidentified earlier node", async () => {
+  const r = await run({ url }, async () => page(
+    html({ ...entity, name: "식별 안 된 장소" }) + html({ ...entity, name: "대상 장소", "@id": `${url}#business` })
+  ));
+  assert.equal(r.results[0].place.name, "대상 장소");
+});
+
+test("known legacy mobile and desktop place URLs identify numeric code", async () => {
+  for (const u of ["https://m.map.naver.com/search2/site.naver?code=123", "https://map.naver.com/local/siteview.nhn?code=123"]) {
+    const r = await run({ url: u });
+    assert.equal(r.successCount, 1);
+    assert.equal(r.results[0].providerPlaceId, "123");
+  }
+});
+
+test("an arbitrary id query must not turn a saved list or shortlink into a place", async () => {
+  for (const u of ["https://map.naver.com/p/favorite/myPlace/folder/1?id=123", "https://naver.me/example?id=123"]) {
+    const r = await run({ url: u });
+    assert.equal(r.results[0].error.code, "UNSUPPORTED_PAGE");
+  }
+});
+
+test("zero, negative and decimal coordinate strings remain valid", async () => {
+  for (const [lat, lng] of [[0, 0], ["-35.1", "+129.1"], [" .5 ", "0"]]) {
+    const r = await run({ url }, async () => page(html({ ...entity, geo: { latitude: lat, longitude: lng } })));
+    assert.equal(r.results[0].place.latitude, Number(lat));
+    assert.equal(r.results[0].place.longitude, Number(lng));
+  }
+});

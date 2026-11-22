@@ -8,7 +8,7 @@
     "deploy": "firebase deploy --only functions",
     "logs": "firebase functions:log",
     "test": "node testbackend.js",
-    "test:parser": "node --test parse-places.test.js"
+    "test:parser": "node --test parse-places.test.js travel-api.test.js"
   },
   "engines": {
     "node": "22"

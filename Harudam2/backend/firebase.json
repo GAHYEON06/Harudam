@@ -10,7 +10,8 @@
         "firebase-debug.log",
         "firebase-debug.*.log",
         "test-backend.js",
-        "testbackend.js"
+        "testbackend.js",
+        "*.test.js"
       ]
     }
   ],

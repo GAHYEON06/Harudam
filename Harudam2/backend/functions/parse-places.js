@@ -87,26 +87,76 @@ function clean(value, max) {
     .replace(/\s+/g, " ").trim().slice(0, max);
 }
 
+const TYPE_CATEGORY = new Map([
+  ...["Restaurant", "CafeOrCoffeeShop", "Bakery", "BarOrPub", "FoodEstablishment"].map((t) => [t, "FOOD"]),
+  ...["Hotel", "LodgingBusiness", "Motel", "Hostel", "Resort"].map((t) => [t, "STAY"]),
+  ...["TouristAttraction", "Museum", "Park", "LandmarksOrHistoricalBuildings", "Beach"].map((t) => [t, "TOUR"]),
+  ...["LocalBusiness", "Place", "Accommodation", "TouristDestination", "Store"].map((t) => [t, "OTHER"]),
+]);
+
+function schemaTypes(value) {
+  return (Array.isArray(value) ? value : [value])
+    .filter((t) => typeof t === "string")
+    .map((t) => t.replace(/^https?:\/\/schema\.org\//, ""));
+}
+
 function category(types) {
-  if (/Restaurant|CafeOrCoffeeShop|Bakery|BarOrPub|FoodEstablishment/i.test(types)) return "FOOD";
-  if (/Hotel|LodgingBusiness|Motel|Hostel|Resort/i.test(types)) return "STAY";
-  if (/TouristAttraction|Museum|Park|LandmarksOrHistoricalBuildings|Beach/i.test(types)) return "TOUR";
+  for (const type of types) {
+    if (TYPE_CATEGORY.has(type) && TYPE_CATEGORY.get(type) !== "OTHER") return TYPE_CATEGORY.get(type);
+  }
   return "OTHER";
 }
 
+function placeIdFromUrl(url) {
+  if (!HOSTS.has(url.hostname) || url.hostname === "naver.me") return null;
+  const pathId = url.pathname.match(/\/(?:place|restaurant|cafe|accommodation)\/(\d+)(?:\/|$)/)?.[1];
+  if (pathId) return pathId;
+  const legacy = (url.hostname === "m.map.naver.com" && url.pathname === "/search2/site.naver") ||
+    (url.hostname === "map.naver.com" && url.pathname === "/local/siteview.nhn");
+  const id = legacy ? url.searchParams.get("code") :
+    ["/", "/index.nhn"].includes(url.pathname) ? url.searchParams.get("id") : null;
+  return /^\d+$/.test(id || "") ? id : null;
+}
+
+function schemaIdentity(node, baseUrl, placeId) {
+  let matches = false;
+  for (const ref of [node.url, node["@id"]]) {
+    if (typeof ref !== "string") continue;
+    let url;
+    try { url = new URL(ref, baseUrl); } catch { continue; }
+    const candidateId = placeIdFromUrl(url);
+    if (!candidateId) continue;
+    if (candidateId !== placeId) return -1;
+    matches = true;
+  }
+  return matches ? 1 : 0;
+}
+
+function parsedCoordinate(value, min, max) {
+  // Number(false), Number([]), and Number(" ") are zero; those are not coordinates.
+  if (typeof value !== "number" && typeof value !== "string") return null;
+  if (typeof value === "string" && !/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(value.trim())) return null;
+  const number = Number(value);
+  return Number.isFinite(number) && number >= min && number <= max ? number : null;
+}
+
 function extract(html, url, sourceUrl) {
-  const placeId = url.pathname.match(/\/(?:place|restaurant|cafe|accommodation)\/(\d+)(?:\/|$)/)?.[1] ||
-    (/^\d+$/.test(url.searchParams.get("id") || "") ? url.searchParams.get("id") : null);
+  const placeId = placeIdFromUrl(url);
   if (!placeId) throw new ParseError("UNSUPPORTED_PAGE", "개별 장소 링크를 사용해 주세요. 저장 목록·검색 결과 가져오기는 지원하지 않아요.");
   let entity;
+  let identity = -1;
   for (const match of html.matchAll(/<script\b[^>]*type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script\s*>/gi)) {
     let root;
     try { root = JSON.parse(match[1]); } catch { continue; }
     const nodes = Array.isArray(root) ? root : [root];
     const candidates = nodes.flatMap((n) => n && typeof n === "object" ? [n, ...(Array.isArray(n["@graph"]) ? n["@graph"] : [])] : []);
-    entity = candidates.find((n) => n && clean(n.name, 100) &&
-      /LocalBusiness|Restaurant|CafeOrCoffeeShop|Bakery|BarOrPub|FoodEstablishment|Hotel|LodgingBusiness|Motel|Hostel|Resort|TouristAttraction|Museum|Park|LandmarksOrHistoricalBuildings|Beach|Place/.test(String(n["@type"])));
-    if (entity) break;
+    for (const node of candidates) {
+      if (!node || !clean(node.name, 100)) continue;
+      const types = schemaTypes(node["@type"]);
+      if (!types.some((t) => TYPE_CATEGORY.has(t))) continue;
+      const score = schemaIdentity(node, url, placeId);
+      if (score > identity) { entity = node; identity = score; }
+    }
   }
   const meta = {};
   for (const tag of html.matchAll(/<meta\b[^>]*>/gi)) {
@@ -120,17 +170,16 @@ function extract(html, url, sourceUrl) {
   }
   const a = entity?.address;
   const address = clean(typeof a === "string" ? a : a && [a.addressRegion, a.addressLocality, a.streetAddress].filter((v) => typeof v === "string").join(" "), 300);
-  const rawLat = entity?.geo?.latitude;
-  const rawLng = entity?.geo?.longitude;
-  let latitude = rawLat !== undefined && rawLat !== null && rawLat !== "" ? Number(rawLat) : NaN;
-  let longitude = rawLng !== undefined && rawLng !== null && rawLng !== "" ? Number(rawLng) : NaN;
-  if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) latitude = longitude = null;
+  let latitude = parsedCoordinate(entity?.geo?.latitude, -90, 90);
+  let longitude = parsedCoordinate(entity?.geo?.longitude, -180, 180);
+  if (latitude === null || longitude === null) latitude = longitude = null;
+  const placeCategory = category(schemaTypes(entity?.["@type"]));
   return {
-    place: { name, address, category: category(String(entity?.["@type"] || "")), sourceUrl,
+    place: { name, address, category: placeCategory, sourceUrl,
       latitude, longitude, visitDate: null, visitOrder: null, note: "", visitTime: null },
     provider: "NAVER", providerPlaceId: placeId, resolvedUrl: url.href,
     warnings: [...(!address ? ["ADDRESS_UNAVAILABLE"] : []), ...(latitude === null ? ["COORDINATES_UNAVAILABLE"] : []),
-      ...(category(String(entity?.["@type"] || "")) === "OTHER" ? ["CATEGORY_UNCONFIRMED"] : [])],
+      ...(placeCategory === "OTHER" ? ["CATEGORY_UNCONFIRMED"] : [])],
     requiresConfirmation: true,
   };
 }
