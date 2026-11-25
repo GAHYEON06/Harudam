@@ -232,12 +232,11 @@ fun AppNavGraph() {
                 onBackClick = {
                     navController.popBackStack()
                 },
-                onConfirmClick = {
-                    navController.navigate(Routes.RESULT)
+                onConfirmPlacesClick = {
+                    navController.navigate(Routes.TRIP_SCHEDULE)
                 }
             )
         }
-
 
         composable(Routes.TRIP_SCHEDULE) {
             TripScheduleScreen(
@@ -245,12 +244,16 @@ fun AppNavGraph() {
                     navController.popBackStack()
                 },
                 onConfirmClick = {
-                    navController.navigate(Routes.RESULT)
+                    navController.navigate(Routes.RESULT) {
+                        popUpTo(Routes.HOME) {
+                            inclusive = false
+                        }
+                        launchSingleTop = true
+                    }
                 }
             )
         }
 
-        // ResultScreen 화면 등록
         composable(Routes.RESULT) {
             ResultScreen(
                 onBackClick = {
