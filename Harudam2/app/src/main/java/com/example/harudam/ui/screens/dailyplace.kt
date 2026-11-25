@@ -39,6 +39,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.foundation.layout.navigationBarsPadding
 
 private val ScheduleMint = Color(0xFFA0E8CB)
 private val ScheduleMintLight = Color(0xFFC7F9E5)
@@ -63,7 +66,8 @@ private data class SchedulePlaceUi(
 
 /** Figma screen 3: 핸들을 길게 눌러 같은 날짜 안에서 장소 순서를 바꿉니다. */
 @Composable
-fun TripScheduleScreen(onBackClick: () -> Unit = {}) {
+fun TripScheduleScreen(onBackClick: () -> Unit = {},
+                       onConfirmClick: () -> Unit = {}) {
     val days = listOf(
         ScheduleDayUi(
             1,
@@ -85,22 +89,76 @@ fun TripScheduleScreen(onBackClick: () -> Unit = {}) {
         ScheduleDayUi(3, "09.03 (목)", emptyList()),
     )
 
-    Surface(modifier = Modifier.fillMaxSize(), color = ScheduleIvory) {
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = ScheduleIvory
+    ) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState()),
+            modifier = Modifier.fillMaxSize()
         ) {
-            ScheduleHeader(onBackClick = onBackClick)
+
+            // 스크롤 가능한 일정 영역
             Column(
                 modifier = Modifier
+                    .weight(1f)
                     .fillMaxWidth()
-                    .padding(horizontal = 21.dp)
-                    .offset(y = (-40).dp),
-                verticalArrangement = Arrangement.spacedBy(20.dp),
+                    .verticalScroll(rememberScrollState())
             ) {
-                days.forEach { day -> ScheduleDayCard(day) }
+                ScheduleHeader(
+                    onBackClick = onBackClick
+                )
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 21.dp)
+                        .offset(y = (-40).dp),
+                    verticalArrangement = Arrangement.spacedBy(20.dp)
+                ) {
+                    days.forEach { day ->
+                        ScheduleDayCard(day)
+                    }
+                }
             }
+
+            // 하단 고정 버튼
+            ScheduleConfirmButton(
+                onClick = onConfirmClick
+            )
+        }
+    }
+
+}
+@Composable
+private fun ScheduleConfirmButton(
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(ScheduleIvory)
+            .navigationBarsPadding()
+            .padding(
+                horizontal = 21.dp,
+                vertical = 16.dp
+            )
+    ) {
+        Button(
+            onClick = onClick,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(52.dp),
+            shape = RoundedCornerShape(10.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = ScheduleMint,
+                contentColor = ScheduleText
+            )
+        ) {
+            Text(
+                text = "일정 확정하기",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold
+            )
         }
     }
 }
@@ -136,12 +194,7 @@ private fun ScheduleHeader(onBackClick: () -> Unit) {
             color = ScheduleText,
             fontSize = 14.sp,
         )
-        Text(
-            text = "장소 카드를 길게 눌러 드래그해 순서를 바꿀 수 있어요",
-            modifier = Modifier.padding(start = 10.dp, top = 8.dp),
-            color = ScheduleSubtext,
-            fontSize = 12.sp,
-        )
+
     }
 }
 
@@ -260,7 +313,11 @@ private fun ScheduleDayCard(day: ScheduleDayUi) {
             }
         }
     }
+
 }
+
+
+
 
 @Composable
 private fun SchedulePlaceRow(

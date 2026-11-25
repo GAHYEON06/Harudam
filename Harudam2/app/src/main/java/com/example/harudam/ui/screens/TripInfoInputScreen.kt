@@ -1,701 +1,1176 @@
+
 package com.example.harudam.ui.screens
 
-import android.app.DatePickerDialog
-import android.net.Uri
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import java.text.SimpleDateFormat
-import java.util.Calendar
-import java.util.Date
-import java.util.Locale
+import androidx.compose.ui.zIndex
 
-private val CreateMint = Color(0xFFA0E8CB)
-private val CreateMintLight = Color(0xFFC7F9E5)
-private val CreateIvory = Color(0xFFFBF9F4)
-private val CreateText = Color(0xFF554239)
-private val CreateSubtext = Color(0xFF7D6A60)
-private val CreateBorder = Color(0xFFECE5DC)
 
-private data class ImportedPlaceUi(
+// ========================================
+// 색상 정의
+// ========================================
+
+private val ScheduleMint = Color(0xFFA0E8CB)
+private val ScheduleMintLight = Color(0xFFC7F9E5)
+private val ScheduleIvory = Color(0xFFFBF9F4)
+private val ScheduleText = Color(0xFF554239)
+private val ScheduleSubtext = Color(0xFF7D6A60)
+private val ScheduleBorder = Color(0xFFECE5DC)
+
+private val ScheduleGreen = Color(0xFF4A8C76)
+private val SelectorBackground = Color(0xFFF1F8F4)
+
+private val FoodOrange = Color(0xFFEE8A5F)
+private val TourBlue = Color(0xFF4C9BC4)
+private val StayPurple = Color(0xFF9C7EC1)
+
+
+// ========================================
+// UI 데이터 클래스
+// ========================================
+
+private data class TripScheduleDayUi(
+    val dayNumber: Int,
+    val dateLabel: String
+)
+
+private data class TripSchedulePlaceUi(
     val id: String,
     val name: String,
-    val category: String,
-    val latitude: Double,
-    val longitude: Double,
+    val category: String
 )
 
-private val mockPlaces = listOf(
-    ImportedPlaceUi("mock-1", "초량밀면", "음식·카페", 35.1150, 129.0400),
-    ImportedPlaceUi("mock-2", "코이", "음식·카페", 35.1510, 129.1130),
-    ImportedPlaceUi("mock-3", "광안리해수욕장", "관광", 35.1532, 129.1187),
-)
 
-/** Figma screen 2: 여행 이름과 여행 기간을 입력합니다. */
+// ========================================
+// 일정 정리 화면
+// ========================================
+
 @Composable
 fun TripInfoInputScreen(
     onBackClick: () -> Unit = {},
-    onConfirmPlacesClick: () -> Unit = {},
-    onAddUrlClick: (String) -> Unit = {},
+    onConfirmClick: () -> Unit = {}
 ) {
-    var tripName by remember { mutableStateOf("") }
-    var startDateMillis by remember { mutableStateOf<Long?>(null) }
-    var endDateMillis by remember { mutableStateOf<Long?>(null) }
-    var placeListUrl by remember { mutableStateOf("") }
-    val importedPlaces = remember {
-        mutableStateListOf<ImportedPlaceUi>()
+
+    // 테스트용 여행 날짜
+    val days = remember {
+        listOf(
+            TripScheduleDayUi(1, "09.01 (화)"),
+            TripScheduleDayUi(2, "09.02 (수)"),
+            TripScheduleDayUi(3, "09.03 (목)"),
+            TripScheduleDayUi(4, "09.04 (금)"),
+            TripScheduleDayUi(5, "09.05 (토)")
+        )
     }
-    var deletePlaceTargetIndex by remember { mutableStateOf<Int?>(null) }
-    var placeUrlMessage by remember { mutableStateOf<String?>(null) }
-    var isPlaceUrlError by remember { mutableStateOf(false) }
 
-    val tripInfoComplete = tripName.isNotBlank() &&
-            startDateMillis != null &&
-            endDateMillis != null
-    val canConfirmPlaces = tripInfoComplete && placeListUrl.isNotBlank()
+    // 테스트용 URL 파싱 결과
+    val importedPlaces = remember {
+        listOf(
+            TripSchedulePlaceUi(
+                "place-1", "초량밀면", "음식·카페"
+            ),
+            TripSchedulePlaceUi(
+                "place-2", "코이", "음식·카페"
+            ),
+            TripSchedulePlaceUi(
+                "place-3", "광안리해수욕장", "관광"
+            ),
+            TripSchedulePlaceUi(
+                "place-4", "AREA6", "관광"
+            ),
+            TripSchedulePlaceUi(
+                "place-5", "자매국밥", "음식·카페"
+            )
+        )
+    }
 
-    Surface(modifier = Modifier.fillMaxSize(), color = CreateIvory) {
+    // 모든 날짜의 장소 목록을 빈 상태로 초기화
+    val placesByDay = remember {
+        days.associate { day ->
+            day.dayNumber to
+                    mutableStateListOf<TripSchedulePlaceUi>()
+        }
+    }
+
+    // 아직 날짜에 배정되지 않은 장소
+    val availablePlaces = importedPlaces.filter { candidate ->
+        placesByDay.values.none { places ->
+            places.any { it.id == candidate.id }
+        }
+    }
+
+    // 배정된 장소 개수
+    val assignedPlaceCount =
+        importedPlaces.size - availablePlaces.size
+
+    // 최초에는 1일차만 공개
+    var visibleDayCount by remember {
+        mutableIntStateOf(1)
+    }
+
+    // 장소 선택 영역이 열려 있는 날짜
+    var expandedDay by remember {
+        mutableStateOf<Int?>(null)
+    }
+
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = ScheduleIvory
+    ) {
+
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState()),
+            modifier = Modifier.fillMaxSize()
         ) {
-            CreateTripHeader(onBackClick = onBackClick)
 
+            // 스크롤 가능한 일정 영역
             Column(
                 modifier = Modifier
+                    .weight(1f)
                     .fillMaxWidth()
-                    .padding(horizontal = 21.dp)
-                    .offset(y = (-31).dp),
+                    .verticalScroll(rememberScrollState())
             ) {
-                CreateTripForm(
-                    tripName = tripName,
-                    onTripNameChange = { tripName = it },
-                    startDateMillis = startDateMillis,
-                    endDateMillis = endDateMillis,
-                    onStartDateSelected = { selectedDate ->
-                        startDateMillis = selectedDate
-                        if (endDateMillis != null && endDateMillis!! < selectedDate) {
-                            endDateMillis = null
-                        }
-                    },
-                    onEndDateSelected = { endDateMillis = it },
-                    placeListUrl = placeListUrl,
-                    onPlaceListUrlChange = {
-                        placeListUrl = it
-                        placeUrlMessage = null
-                    },
-                    onAddUrlClick = { url ->
-                        if (isValidNaverMapUrl(url)) {
-                            importedPlaces.clear()
-                            importedPlaces.addAll(mockPlaces)
-                            placeUrlMessage = "테스트용 예시 장소 3개를 표시했어요. 실제 URL 파싱은 아직 연결되지 않았어요."
-                            isPlaceUrlError = false
-                            onAddUrlClick(url)
-                        } else {
-                            placeUrlMessage = "naver.me 또는 map.naver.com 공유 링크를 입력해 주세요."
-                            isPlaceUrlError = true
-                        }
-                    },
-                    placeUrlMessage = placeUrlMessage,
-                    isPlaceUrlError = isPlaceUrlError,
-                    placesEnabled = tripInfoComplete,
-                )
-                Spacer(Modifier.height(18.dp))
-                CreateMapPlaceholder(places = importedPlaces)
-                Spacer(Modifier.height(14.dp))
-                Text(
-                    text = "여행 장소 ${importedPlaces.size}",
-                    color = CreateText,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Spacer(Modifier.height(10.dp))
-                if (importedPlaces.isEmpty()) {
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        color = Color.White,
-                        shape = RoundedCornerShape(10.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, CreateBorder),
+
+                Box(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+
+                    ScheduleHeader(
+                        onBackClick = onBackClick
+                    )
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(
+                                start = 21.dp,
+                                end = 21.dp,
+                                top = 121.dp,
+                                bottom = 20.dp
+                            ),
+                        verticalArrangement =
+                            Arrangement.spacedBy(20.dp)
                     ) {
-                        Box(
-                            modifier = Modifier.padding(vertical = 14.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(
-                                "추가된 장소가 없어요",
-                                color = CreateSubtext,
-                                fontSize = 12.sp,
+
+                        // 일정 배정 현황
+                        ScheduleAssignmentProgress(
+                            assignedCount = assignedPlaceCount,
+                            totalCount = importedPlaces.size
+                        )
+
+                        // 공개된 날짜만 화면에 출력
+                        days.take(visibleDayCount).forEach { day ->
+
+                            key(day.dayNumber) {
+
+                                ScheduleDayCard(
+                                    day = day,
+
+                                    places = placesByDay.getValue(
+                                        day.dayNumber
+                                    ),
+
+                                    availablePlaces = availablePlaces,
+
+                                    isExpanded =
+                                        expandedDay == day.dayNumber,
+
+                                    // 장소 추가 영역 열기 및 닫기
+                                    onAddClick = {
+                                        expandedDay =
+                                            if (expandedDay == day.dayNumber) {
+                                                null
+                                            } else {
+                                                day.dayNumber
+                                            }
+                                    },
+
+                                    // 장소 선택
+                                    onPlaceSelected = { place ->
+
+                                        val alreadyAssigned =
+                                            placesByDay.values.any { list ->
+                                                list.any {
+                                                    it.id == place.id
+                                                }
+                                            }
+
+                                        if (!alreadyAssigned) {
+
+                                            placesByDay
+                                                .getValue(day.dayNumber)
+                                                .add(place)
+
+                                            // 다음 날짜 자동 공개
+                                            if (
+                                                day.dayNumber == visibleDayCount &&
+                                                visibleDayCount < days.size
+                                            ) {
+                                                visibleDayCount++
+                                            }
+                                        }
+                                    },
+
+                                    // 장소 배정 취소
+                                    onPlaceRemoved = { place ->
+
+                                        placesByDay
+                                            .getValue(day.dayNumber)
+                                            .remove(place)
+                                    },
+
+                                    // 장소 선택 영역 닫기
+                                    onCloseSelector = {
+                                        expandedDay = null
+                                    }
+                                )
+                            }
+                        }
+
+                        // 다음 날짜 수동 공개
+                        if (visibleDayCount < days.size) {
+
+                            OpenNextDayButton(
+                                nextDayNumber = visibleDayCount + 1,
+                                onClick = {
+                                    visibleDayCount++
+                                    expandedDay = null
+                                }
                             )
                         }
                     }
-                } else {
-                    importedPlaces.forEachIndexed { index, place ->
-                        ImportedPlaceRow(
-                            place = place,
-                            onDeleteClick = { deletePlaceTargetIndex = index },
-                        )
-                        if (index != importedPlaces.lastIndex) {
-                            Spacer(Modifier.height(12.dp))
-                        }
-                    }
                 }
-                Spacer(Modifier.height(26.dp))
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 34.dp)
-                        .height(47.dp)
-                        .clickable(
-                            enabled = canConfirmPlaces,
-                            onClick = onConfirmPlacesClick,
-                        ),
-                    color = if (canConfirmPlaces) CreateMint else Color(0xFFE7E3DC),
-                    shape = RoundedCornerShape(10.dp),
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Text(
-                            "장소 확정하기",
-                            color = if (canConfirmPlaces) CreateText else CreateSubtext,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                    }
-                }
-                Spacer(Modifier.height(24.dp))
             }
-        }
 
-        deletePlaceTargetIndex?.let { index ->
-            val place = importedPlaces.getOrNull(index)
-            if (place != null) {
-                AlertDialog(
-                    onDismissRequest = { deletePlaceTargetIndex = null },
-                    title = { Text("장소를 삭제할까요?") },
-                    text = { Text("${place.name} 장소를 여행 목록에서 삭제해요.") },
-                    confirmButton = {
-                        TextButton(
-                            onClick = {
-                                importedPlaces.removeAt(index)
-                                deletePlaceTargetIndex = null
-                            },
-                        ) {
-                            Text("삭제")
-                        }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = { deletePlaceTargetIndex = null }) {
-                            Text("취소")
-                        }
-                    },
-                )
-            }
+            // 하단 고정 버튼
+            ScheduleConfirmButton(
+                onClick = onConfirmClick
+            )
         }
     }
 }
 
+
+// ========================================
+// 상단 헤더
+// ========================================
+
 @Composable
-private fun CreateTripHeader(onBackClick: () -> Unit) {
-    Box(
+private fun ScheduleHeader(
+    onBackClick: () -> Unit
+) {
+
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .height(119.dp)
-            .background(CreateMint, RoundedCornerShape(bottomStart = 10.dp, bottomEnd = 10.dp)),
-    ) {
-        Row(
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(start = 16.dp, top = 34.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                "‹",
-                modifier = Modifier.clickable(onClick = onBackClick),
-                color = CreateText,
-                fontSize = 27.sp,
-                lineHeight = 27.sp,
+            .height(161.dp)
+            .background(
+                ScheduleMint,
+                RoundedCornerShape(
+                    bottomStart = 10.dp,
+                    bottomEnd = 10.dp
+                )
             )
+            .padding(
+                start = 16.dp,
+                end = 20.dp,
+                top = 32.dp
+            )
+    ) {
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+
             Text(
-                "새 여행 만들기",
+                text = "‹",
+                modifier = Modifier.clickable(
+                    onClick = onBackClick
+                ),
+                color = ScheduleText,
+                fontSize = 27.sp,
+                lineHeight = 27.sp
+            )
+
+            Text(
+                text = "일정 정리",
                 modifier = Modifier.padding(start = 9.dp),
-                color = CreateText,
+                color = ScheduleText,
                 fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
+                fontWeight = FontWeight.Bold
             )
         }
+
+        Text(
+            text = "부산여행 | 2026.09.01 ~ 09.05",
+            modifier = Modifier.padding(
+                start = 25.dp,
+                top = 7.dp
+            ),
+            color = ScheduleText,
+            fontSize = 14.sp
+        )
     }
 }
 
+
+// ========================================
+// 일정 배정 진행률
+// ========================================
+
 @Composable
-private fun CreateTripForm(
-    tripName: String,
-    onTripNameChange: (String) -> Unit,
-    startDateMillis: Long?,
-    endDateMillis: Long?,
-    onStartDateSelected: (Long) -> Unit,
-    onEndDateSelected: (Long) -> Unit,
-    placeListUrl: String,
-    onPlaceListUrlChange: (String) -> Unit,
-    onAddUrlClick: (String) -> Unit,
-    placeUrlMessage: String?,
-    isPlaceUrlError: Boolean,
-    placesEnabled: Boolean,
+private fun ScheduleAssignmentProgress(
+    assignedCount: Int,
+    totalCount: Int
 ) {
-    val context = LocalContext.current
-    val dateFormatter = remember { SimpleDateFormat("yyyy.MM.dd", Locale.KOREA) }
+
+    val progress = if (totalCount > 0) {
+        (assignedCount.toFloat() / totalCount)
+            .coerceIn(0f, 1f)
+    } else {
+        0f
+    }
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = Color.White,
         shape = RoundedCornerShape(10.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, CreateBorder),
+        border = BorderStroke(1.dp, ScheduleBorder),
+        shadowElevation = 2.dp
     ) {
-        Column(modifier = Modifier.padding(horizontal = 17.dp, vertical = 12.dp)) {
-            FormLabel("여행 이름")
-            Spacer(Modifier.height(3.dp))
-            OutlinedTextField(
-                value = tripName,
-                onValueChange = onTripNameChange,
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                placeholder = {
-                    Text("여행 이름 입력", color = CreateSubtext, fontSize = 12.sp)
-                },
-                textStyle = TextStyle(
-                    color = CreateText,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                ),
-                shape = RoundedCornerShape(10.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = CreateIvory,
-                    unfocusedContainerColor = CreateIvory,
-                    focusedBorderColor = CreateBorder,
-                    unfocusedBorderColor = CreateBorder,
-                    cursorColor = CreateText,
-                ),
+
+        Column(
+            modifier = Modifier.padding(
+                horizontal = 16.dp,
+                vertical = 14.dp
             )
+        ) {
 
-            Spacer(Modifier.height(8.dp))
-            FormLabel("날짜", modifier = Modifier.padding(start = 2.dp))
-            Spacer(Modifier.height(4.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                DateInputField(
-                    text = startDateMillis?.let { dateFormatter.format(Date(it)) }.orEmpty(),
-                    placeholder = "시작 날짜",
-                    modifier = Modifier.width(114.dp),
-                    onClick = {
-                        val initial = startDateMillis?.let { Calendar.getInstance().apply { timeInMillis = it } }
-                            ?: Calendar.getInstance()
-                        DatePickerDialog(
-                            context,
-                            { _, year, month, day ->
-                                val selected = Calendar.getInstance().apply {
-                                    set(year, month, day, 0, 0, 0)
-                                    set(Calendar.MILLISECOND, 0)
-                                }
-                                onStartDateSelected(selected.timeInMillis)
-                            },
-                            initial.get(Calendar.YEAR),
-                            initial.get(Calendar.MONTH),
-                            initial.get(Calendar.DAY_OF_MONTH),
-                        ).show()
-                    },
-                )
-                Text("~", color = CreateText, fontSize = 15.sp)
-                DateInputField(
-                    text = endDateMillis?.let { dateFormatter.format(Date(it)) }.orEmpty(),
-                    placeholder = "종료 날짜",
-                    modifier = Modifier.width(118.dp),
-                    onClick = {
-                        val initialMillis = endDateMillis ?: startDateMillis ?: System.currentTimeMillis()
-                        val initial = Calendar.getInstance().apply { timeInMillis = initialMillis }
-                        DatePickerDialog(
-                            context,
-                            { _, year, month, day ->
-                                val selected = Calendar.getInstance().apply {
-                                    set(year, month, day, 0, 0, 0)
-                                    set(Calendar.MILLISECOND, 0)
-                                }
-                                onEndDateSelected(selected.timeInMillis)
-                            },
-                            initial.get(Calendar.YEAR),
-                            initial.get(Calendar.MONTH),
-                            initial.get(Calendar.DAY_OF_MONTH),
-                        ).apply {
-                            startDateMillis?.let { datePicker.minDate = it }
-                        }.show()
-                    },
-                )
-            }
 
-            if (startDateMillis != null && endDateMillis == null) {
-                Spacer(Modifier.height(4.dp))
                 Text(
-                    text = "종료 날짜는 시작 날짜 이후로 선택해 주세요.",
-                    color = CreateSubtext,
-                    fontSize = 11.sp,
+                    text = "일정 배정 현황",
+                    modifier = Modifier.weight(1f),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = ScheduleText
+                )
+
+                Text(
+                    text = "$assignedCount / ${totalCount}개 장소",
+                    fontSize = 12.sp,
+                    color = ScheduleSubtext
                 )
             }
 
-            Spacer(Modifier.height(8.dp))
-            FormLabel("장소 목록 URL", modifier = Modifier.padding(start = 2.dp))
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(10.dp))
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFE5E4DD))
+            ) {
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(progress)
+                        .fillMaxHeight()
+                        .background(
+                            Color(0xFF66B99A),
+                            CircleShape
+                        )
+                )
+            }
+        }
+    }
+}
+
+
+// ========================================
+// 날짜별 일정 카드
+// ========================================
+
+@Composable
+private fun ScheduleDayCard(
+    day: TripScheduleDayUi,
+    places: SnapshotStateList<TripSchedulePlaceUi>,
+    availablePlaces: List<TripSchedulePlaceUi>,
+    isExpanded: Boolean,
+    onAddClick: () -> Unit,
+    onPlaceSelected: (TripSchedulePlaceUi) -> Unit,
+    onPlaceRemoved: (TripSchedulePlaceUi) -> Unit,
+    onCloseSelector: () -> Unit
+) {
+
+    var draggedIndex by remember(day.dayNumber) {
+        mutableStateOf<Int?>(null)
+    }
+
+    var dragOffsetY by remember(day.dayNumber) {
+        mutableFloatStateOf(0f)
+    }
+
+    val density = LocalDensity.current
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = Color.White,
+        shape = RoundedCornerShape(10.dp),
+        border = BorderStroke(1.dp, ScheduleBorder),
+        shadowElevation = 3.dp
+    ) {
+
+        Column(
+            modifier = Modifier.padding(
+                horizontal = 16.dp,
+                vertical = 12.dp
+            )
+        ) {
+
+            // 일차 및 날짜 정보
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                OutlinedTextField(
-                    value = placeListUrl,
-                    onValueChange = onPlaceListUrlChange,
-                    enabled = placesEnabled,
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(52.dp),
-                    singleLine = true,
-                    placeholder = {
-                        Text(
-                            text = if (placesEnabled) {
-                                "지도 목록 링크를 붙여넣으세요"
-                            } else {
-                                "여행 이름과 날짜를 먼저 입력"
-                            },
-                            color = CreateSubtext,
-                            fontSize = 12.sp,
-                        )
-                    },
-                    textStyle = TextStyle(
-                        color = CreateText,
-                        fontSize = 12.sp,
-                    ),
-                    shape = RoundedCornerShape(10.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = Color.White,
-                        unfocusedContainerColor = Color.White,
-                        disabledContainerColor = Color(0xFFF1EEE8),
-                        focusedBorderColor = CreateBorder,
-                        unfocusedBorderColor = CreateBorder,
-                        disabledBorderColor = CreateBorder,
-                        focusedTextColor = CreateText,
-                        unfocusedTextColor = CreateText,
-                        disabledTextColor = CreateSubtext,
-                        cursorColor = CreateText,
-                    ),
+
+                Text(
+                    text = "${day.dayNumber}일차",
+                    color = ScheduleText,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold
                 )
 
-                val canAddUrl = placesEnabled && placeListUrl.isNotBlank()
-                Surface(
+                Text(
+                    text = day.dateLabel,
                     modifier = Modifier
-                        .size(width = 58.dp, height = 52.dp)
-                        .clickable(
-                            enabled = canAddUrl,
-                            onClick = { onAddUrlClick(placeListUrl.trim()) },
-                        ),
-                    color = if (canAddUrl) CreateMintLight else Color(0xFFE7E3DC),
-                    shape = RoundedCornerShape(9.dp),
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Text(
-                            text = "추가",
-                            color = if (canAddUrl) CreateText else CreateSubtext,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.SemiBold,
+                        .padding(start = 10.dp)
+                        .weight(1f),
+                    color = ScheduleSubtext,
+                    fontSize = 12.sp
+                )
+
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(ScheduleMintLight)
+                        .clickable(onClick = onAddClick)
+                        .padding(
+                            horizontal = 12.dp,
+                            vertical = 7.dp
                         )
-                    }
+                ) {
+
+                    Text(
+                        text = if (isExpanded) {
+                            "− 닫기"
+                        } else {
+                            "+ 추가"
+                        },
+                        color = ScheduleText,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
             }
-            placeUrlMessage?.let { message ->
-                Spacer(Modifier.height(5.dp))
-                Text(
-                    text = message,
-                    color = if (isPlaceUrlError) Color(0xFFB3261E) else CreateSubtext,
-                    fontSize = 11.sp,
-                )
+
+            // 장소가 없는 날짜
+            if (places.isEmpty() && !isExpanded) {
+
+                Spacer(Modifier.height(9.dp))
+
+                EmptyDayPlace()
             }
-        }
-    }
-}
 
-@Composable
-private fun FormLabel(text: String, modifier: Modifier = Modifier) {
-    Text(text, modifier = modifier.padding(start = 9.dp), color = CreateSubtext, fontSize = 12.sp)
-}
-
-@Composable
-private fun DateInputField(
-    text: String,
-    placeholder: String,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit,
-) {
-    Surface(
-        modifier = modifier
-            .height(43.dp)
-            .clickable(onClick = onClick),
-        color = CreateIvory,
-        shape = RoundedCornerShape(10.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, CreateBorder),
-    ) {
-        Box(modifier = Modifier.padding(horizontal = 12.dp), contentAlignment = Alignment.CenterStart) {
-            Text(
-                text = text.ifEmpty { placeholder },
-                color = if (text.isEmpty()) CreateSubtext else CreateText,
-                fontSize = 12.sp,
-                fontWeight = if (text.isEmpty()) FontWeight.Normal else FontWeight.SemiBold,
-            )
-        }
-    }
-}
-
-@Composable
-private fun CreateMapPlaceholder(places: List<ImportedPlaceUi>) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(160.dp)
-            .background(Color.White, RoundedCornerShape(10.dp))
-            .padding(1.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = CreateIvory,
-            shape = RoundedCornerShape(10.dp),
-            border = androidx.compose.foundation.BorderStroke(1.dp, CreateBorder),
-        ) {
+            // 배정된 장소 목록
             if (places.isNotEmpty()) {
+
+                Spacer(Modifier.height(9.dp))
+
                 Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalArrangement =
+                        Arrangement.spacedBy(12.dp)
                 ) {
-                    Text(
-                        text = "예시 장소 좌표 · 지도 연동 전",
-                        color = CreateSubtext,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    places.take(3).forEachIndexed { index, place ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(32.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(22.dp)
-                                    .background(CreateMintLight, CircleShape),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text(
-                                    text = (index + 1).toString(),
-                                    color = CreateText,
-                                    fontSize = 11.sp,
-                                )
-                            }
-                            Text(
-                                text = place.name,
-                                modifier = Modifier
-                                    .padding(start = 7.dp)
-                                    .weight(1f),
-                                color = CreateText,
-                                fontSize = 11.sp,
-                                maxLines = 1,
-                            )
-                            Text(
-                                text = String.format(
-                                    Locale.US,
-                                    "%.4f, %.4f",
-                                    place.latitude,
-                                    place.longitude,
-                                ),
-                                color = CreateSubtext,
-                                fontSize = 10.sp,
+
+                    places.forEachIndexed { index, place ->
+
+                        key(place.id) {
+
+                            SchedulePlaceRow(
+                                number = index + 1,
+                                place = place,
+
+                                isDragging =
+                                    draggedIndex == index,
+
+                                dragOffsetY = dragOffsetY,
+
+                                onRemoveClick = {
+                                    onPlaceRemoved(place)
+                                },
+
+                                onDragStart = {
+                                    draggedIndex = index
+                                    dragOffsetY = 0f
+                                },
+
+                                onDragDelta = { deltaY ->
+
+                                    val currentIndex = draggedIndex
+
+                                    if (
+                                        currentIndex != null &&
+                                        currentIndex in places.indices
+                                    ) {
+
+                                        val rowStepPx = with(density) {
+                                            (45.dp + 12.dp).toPx()
+                                        }
+
+                                        var remainingOffset =
+                                            dragOffsetY + deltaY
+
+                                        var targetIndex =
+                                            currentIndex
+
+                                        // 아래 방향 이동
+                                        while (
+                                            remainingOffset >
+                                            rowStepPx / 2f &&
+                                            targetIndex <
+                                            places.lastIndex
+                                        ) {
+                                            targetIndex++
+                                            remainingOffset -=
+                                                rowStepPx
+                                        }
+
+                                        // 위 방향 이동
+                                        while (
+                                            remainingOffset <
+                                            -rowStepPx / 2f &&
+                                            targetIndex > 0
+                                        ) {
+                                            targetIndex--
+                                            remainingOffset +=
+                                                rowStepPx
+                                        }
+
+                                        // 방문 순서 변경
+                                        if (
+                                            targetIndex != currentIndex
+                                        ) {
+
+                                            val movedPlace =
+                                                places.removeAt(
+                                                    currentIndex
+                                                )
+
+                                            places.add(
+                                                targetIndex,
+                                                movedPlace
+                                            )
+
+                                            draggedIndex = targetIndex
+                                        }
+
+                                        dragOffsetY = remainingOffset
+                                            .coerceIn(
+                                                -rowStepPx / 2f,
+                                                rowStepPx / 2f
+                                            )
+                                    }
+                                },
+
+                                onDragFinished = {
+                                    draggedIndex = null
+                                    dragOffsetY = 0f
+                                }
                             )
                         }
                     }
                 }
+            }
+
+            // 인라인 장소 선택 영역
+            if (isExpanded) {
+
+                Spacer(Modifier.height(12.dp))
+
+                InlinePlaceSelector(
+                    dayNumber = day.dayNumber,
+                    availablePlaces = availablePlaces,
+                    onPlaceSelected = onPlaceSelected,
+                    onClose = onCloseSelector
+                )
+            }
+        }
+    }
+}
+
+
+// ========================================
+// 인라인 장소 선택 영역
+// ========================================
+
+@Composable
+private fun InlinePlaceSelector(
+    dayNumber: Int,
+    availablePlaces: List<TripSchedulePlaceUi>,
+    onPlaceSelected: (TripSchedulePlaceUi) -> Unit,
+    onClose: () -> Unit
+) {
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = SelectorBackground,
+        shape = RoundedCornerShape(10.dp)
+    ) {
+
+        Column(
+            modifier = Modifier.padding(12.dp)
+        ) {
+
+            Text(
+                text = "${dayNumber}일차 장소 추가",
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                color = ScheduleText
+            )
+
+            Spacer(Modifier.height(4.dp))
+
+            Text(
+                text = "미배정 장소 ${availablePlaces.size}개",
+                fontSize = 12.sp,
+                color = ScheduleSubtext
+            )
+
+            Spacer(Modifier.height(12.dp))
+
+            if (availablePlaces.isEmpty()) {
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+
+                    Text(
+                        text = "모든 장소가 배정되었어요.",
+                        fontSize = 12.sp,
+                        color = ScheduleSubtext
+                    )
+                }
+
             } else {
+
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .fillMaxSize()
-                        .padding(horizontal = 20.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
+                        .heightIn(max = 260.dp)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement =
+                        Arrangement.spacedBy(8.dp)
                 ) {
 
-                    Spacer(Modifier.height(9.dp))
-                    Text(
-                        text = "지도에 표시할 장소가 없어요",
-                        color = CreateText,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        text = "장소 목록 URL을 추가하면 여기에 표시돼요.",
-                        color = CreateSubtext,
-                        fontSize = 11.sp,
-                    )
+                    availablePlaces.forEach { place ->
+
+                        key(place.id) {
+
+                            AvailablePlaceRow(
+                                place = place,
+                                onClick = {
+                                    onPlaceSelected(place)
+                                }
+                            )
+                        }
+                    }
                 }
             }
-        }
-    }
-}
 
-@Composable
-private fun ImportedPlaceRow(
-    place: ImportedPlaceUi,
-    onDeleteClick: () -> Unit,
-) {
-    Surface(
-        modifier = Modifier.fillMaxWidth().height(47.dp),
-        color = Color.White,
-        shape = RoundedCornerShape(10.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, CreateBorder),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 9.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text("♧", color = Color(0xFF8AAE9A), fontSize = 20.sp)
-            Text(place.name, modifier = Modifier.padding(start = 9.dp).weight(1f), color = CreateText, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-            CategoryTag(place.category)
-            IconButton(
-                onClick = onDeleteClick,
-                modifier = Modifier.size(36.dp),
+            Spacer(Modifier.height(8.dp))
+
+            TextButton(
+                onClick = onClose,
+                modifier = Modifier.fillMaxWidth()
             ) {
-                PlaceDeleteIcon(modifier = Modifier.size(16.dp))
+
+                Text(
+                    text = "장소 선택 완료",
+                    color = ScheduleGreen,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
             }
         }
     }
 }
 
-private fun isValidNaverMapUrl(rawUrl: String): Boolean {
-    val uri = runCatching { Uri.parse(rawUrl.trim()) }.getOrNull() ?: return false
-    val scheme = uri.scheme?.lowercase(Locale.ROOT)
-    val host = uri.host?.lowercase(Locale.ROOT) ?: return false
-    val isHttpUrl = scheme == "http" || scheme == "https"
-    val isNaverHost = host == "naver.me" ||
-            host == "naver.com" ||
-            host.endsWith(".naver.com")
-    val hasPathOrQuery = !uri.path.isNullOrBlank() || !uri.query.isNullOrBlank()
 
-    return isHttpUrl && isNaverHost && hasPathOrQuery
-}
+// ========================================
+// 미배정 장소 선택 항목
+// ========================================
 
 @Composable
-private fun PlaceDeleteIcon(modifier: Modifier = Modifier) {
-    Canvas(modifier = modifier) {
-        val stroke = 1.6.dp.toPx()
-        val left = size.width * 0.24f
-        val top = size.height * 0.29f
-        val bodyWidth = size.width * 0.52f
-        val bodyHeight = size.height * 0.57f
+private fun AvailablePlaceRow(
+    place: TripSchedulePlaceUi,
+    onClick: () -> Unit
+) {
 
-        drawRoundRect(
-            color = CreateSubtext,
-            topLeft = Offset(left, top),
-            size = Size(bodyWidth, bodyHeight),
-            cornerRadius = CornerRadius(1.dp.toPx()),
-            style = androidx.compose.ui.graphics.drawscope.Stroke(width = stroke),
+    Surface(
+        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(48.dp),
+        shape = RoundedCornerShape(8.dp),
+        color = Color.White,
+        border = BorderStroke(1.dp, ScheduleBorder)
+    ) {
+
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+
+            Text(
+                text = place.name,
+                modifier = Modifier.weight(1f),
+                color = ScheduleText,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            ScheduleCategoryChip(
+                category = place.category
+            )
+
+            Spacer(Modifier.width(8.dp))
+
+            Text(
+                text = "+",
+                fontSize = 20.sp,
+                color = ScheduleGreen,
+                fontWeight = FontWeight.Medium
+            )
+        }
+    }
+}
+
+
+// ========================================
+// 배정된 장소 항목
+// ========================================
+
+@Composable
+private fun SchedulePlaceRow(
+    number: Int,
+    place: TripSchedulePlaceUi,
+    isDragging: Boolean,
+    dragOffsetY: Float,
+    onRemoveClick: () -> Unit,
+    onDragStart: () -> Unit,
+    onDragDelta: (Float) -> Unit,
+    onDragFinished: () -> Unit
+) {
+
+    val currentOnDragStart by rememberUpdatedState(onDragStart)
+    val currentOnDragDelta by rememberUpdatedState(onDragDelta)
+    val currentOnDragFinished by rememberUpdatedState(onDragFinished)
+
+    Row(
+        modifier = Modifier
+            .graphicsLayer {
+
+                translationY =
+                    if (isDragging) dragOffsetY else 0f
+
+                shadowElevation =
+                    if (isDragging) 8.dp.toPx() else 0f
+
+                shape = RoundedCornerShape(10.dp)
+            }
+            .zIndex(if (isDragging) 1f else 0f)
+            .fillMaxWidth()
+            .height(45.dp)
+            .background(
+                ScheduleIvory,
+                RoundedCornerShape(10.dp)
+            )
+            .padding(horizontal = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+
+        PlaceOrderBadge(number)
+
+        Text(
+            text = place.name,
+            modifier = Modifier
+                .padding(start = 9.dp, end = 4.dp)
+                .weight(1f),
+            color = ScheduleText,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
-        drawLine(
-            color = CreateSubtext,
-            start = Offset(size.width * 0.17f, size.height * 0.23f),
-            end = Offset(size.width * 0.83f, size.height * 0.23f),
-            strokeWidth = stroke,
+
+        ScheduleCategoryChip(
+            category = place.category
         )
-        drawLine(
-            color = CreateSubtext,
-            start = Offset(size.width * 0.39f, size.height * 0.15f),
-            end = Offset(size.width * 0.61f, size.height * 0.15f),
-            strokeWidth = stroke,
+
+        // 장소 배정 취소 버튼
+        IconButton(
+            onClick = onRemoveClick,
+            enabled = !isDragging,
+            modifier = Modifier
+                .size(32.dp)
+                .semantics {
+                    contentDescription = "${place.name} 배정 취소"
+                }
+        ) {
+
+            ScheduleRemoveIcon(
+                modifier = Modifier.size(15.dp)
+            )
+        }
+
+        // 드래그 핸들
+        Box(
+            modifier = Modifier
+                .size(
+                    width = 24.dp,
+                    height = 40.dp
+                )
+                .pointerInput(place.id) {
+
+                    detectDragGesturesAfterLongPress(
+
+                        onDragStart = {
+                            currentOnDragStart()
+                        },
+
+                        onDrag = { change, dragAmount ->
+                            change.consume()
+                            currentOnDragDelta(dragAmount.y)
+                        },
+
+                        onDragEnd = {
+                            currentOnDragFinished()
+                        },
+
+                        onDragCancel = {
+                            currentOnDragFinished()
+                        }
+                    )
+                },
+            contentAlignment = Alignment.Center
+        ) {
+
+            Text(
+                text = "≡",
+                color = ScheduleSubtext,
+                fontSize = 19.sp,
+                lineHeight = 19.sp
+            )
+        }
+    }
+}
+
+
+// ========================================
+// 장소 배정 취소 아이콘
+// ========================================
+
+@Composable
+private fun ScheduleRemoveIcon(
+    modifier: Modifier = Modifier
+) {
+
+    Canvas(modifier = modifier) {
+
+        val stroke = 1.5.dp.toPx()
+
+        val w = size.width
+        val h = size.height
+
+        // 휴지통 몸체
+        drawRect(
+            color = ScheduleSubtext,
+            topLeft = Offset(w * 0.23f, h * 0.3f),
+            size = Size(w * 0.54f, h * 0.6f),
+            style = Stroke(width = stroke)
         )
+
+        // 휴지통 뚜껑
         drawLine(
-            color = CreateSubtext,
-            start = Offset(size.width * 0.42f, size.height * 0.39f),
-            end = Offset(size.width * 0.42f, size.height * 0.73f),
-            strokeWidth = stroke,
+            color = ScheduleSubtext,
+            start = Offset(w * 0.12f, h * 0.3f),
+            end = Offset(w * 0.88f, h * 0.3f),
+            strokeWidth = stroke
         )
+
+        // 뚜껑 손잡이
         drawLine(
-            color = CreateSubtext,
-            start = Offset(size.width * 0.58f, size.height * 0.39f),
-            end = Offset(size.width * 0.58f, size.height * 0.73f),
-            strokeWidth = stroke,
+            color = ScheduleSubtext,
+            start = Offset(w * 0.36f, h * 0.13f),
+            end = Offset(w * 0.64f, h * 0.13f),
+            strokeWidth = stroke
+        )
+
+        // 내부 왼쪽 선
+        drawLine(
+            color = ScheduleSubtext,
+            start = Offset(w * 0.42f, h * 0.43f),
+            end = Offset(w * 0.42f, h * 0.76f),
+            strokeWidth = stroke
+        )
+
+        // 내부 오른쪽 선
+        drawLine(
+            color = ScheduleSubtext,
+            start = Offset(w * 0.58f, h * 0.43f),
+            end = Offset(w * 0.58f, h * 0.76f),
+            strokeWidth = stroke
         )
     }
 }
 
+
+// ========================================
+// 방문 순서 번호
+// ========================================
+
 @Composable
-private fun CategoryTag(text: String) {
+private fun PlaceOrderBadge(
+    number: Int
+) {
+
+    Box(
+        modifier = Modifier
+            .size(20.dp)
+            .background(
+                ScheduleMintLight,
+                CircleShape
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+
+        Text(
+            text = number.toString(),
+            color = ScheduleGreen,
+            fontSize = 12.sp
+        )
+    }
+}
+
+
+// ========================================
+// 장소 카테고리
+// ========================================
+
+@Composable
+private fun ScheduleCategoryChip(
+    category: String
+) {
+
+    val dotColor = when (category) {
+        "관광" -> TourBlue
+        "음식·카페" -> FoodOrange
+        "숙소" -> StayPurple
+        else -> Color.Gray
+    }
+
     Surface(
         color = Color.White,
         shape = CircleShape,
-        border = androidx.compose.foundation.BorderStroke(1.dp, CreateBorder),
+        border = BorderStroke(1.dp, ScheduleBorder)
     ) {
+
         Row(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(
+                horizontal = 8.dp,
+                vertical = 3.dp
+            ),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(Modifier.size(6.dp).background(Color(0xFFEE8A5F), CircleShape))
-            Text(text, modifier = Modifier.padding(start = 5.dp), color = CreateText, fontSize = 11.sp)
+
+            Box(
+                modifier = Modifier
+                    .size(6.dp)
+                    .background(dotColor, CircleShape)
+            )
+
+            Text(
+                text = category,
+                modifier = Modifier.padding(start = 5.dp),
+                color = ScheduleText,
+                fontSize = 11.sp
+            )
         }
     }
 }
 
-@Preview(showBackground = true, widthDp = 360, heightDp = 800)
+
+// ========================================
+// 빈 일정 표시
+// ========================================
+
+@Composable
+private fun EmptyDayPlace() {
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(45.dp),
+        color = Color.White,
+        shape = RoundedCornerShape(10.dp),
+        border = BorderStroke(1.dp, ScheduleBorder)
+    ) {
+
+        Box(
+            contentAlignment = Alignment.Center
+        ) {
+
+            Text(
+                text = "아직 장소가 없어요",
+                color = ScheduleSubtext,
+                fontSize = 12.sp
+            )
+        }
+    }
+}
+
+
+// ========================================
+// 다음 날짜 수동 공개 버튼
+// ========================================
+
+@Composable
+private fun OpenNextDayButton(
+    nextDayNumber: Int,
+    onClick: () -> Unit
+) {
+
+    Surface(
+        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(48.dp),
+        color = ScheduleIvory,
+        shape = RoundedCornerShape(10.dp),
+        border = BorderStroke(
+            1.dp,
+            Color(0xFFA0CCB8)
+        )
+    ) {
+
+        Box(
+            contentAlignment = Alignment.Center
+        ) {
+
+            Text(
+                text = "+ ${nextDayNumber}일차 일정 열기",
+                color = ScheduleGreen,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+    }
+}
+
+
+// ========================================
+// 일정 확정하기 버튼
+// ========================================
+
+@Composable
+private fun ScheduleConfirmButton(
+    onClick: () -> Unit
+) {
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(ScheduleIvory)
+            .navigationBarsPadding()
+            .padding(
+                horizontal = 21.dp,
+                vertical = 16.dp
+            )
+    ) {
+
+        Button(
+            onClick = onClick,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(52.dp),
+            shape = RoundedCornerShape(10.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = ScheduleMint,
+                contentColor = ScheduleText
+            )
+        ) {
+
+            Text(
+                text = "일정 확정하기",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+
+// ========================================
+// Android Studio Preview
+// ========================================
+
+@Preview(
+    showBackground = true,
+    showSystemUi = true,
+    device = "spec:width=393dp,height=852dp"
+    
+)
 @Composable
 private fun TripInfoInputScreenPreview() {
-    MaterialTheme { TripInfoInputScreen() }
+
+    MaterialTheme {
+        TripInfoInputScreen()
+    }
 }

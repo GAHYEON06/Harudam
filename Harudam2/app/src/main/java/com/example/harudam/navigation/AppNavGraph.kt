@@ -17,6 +17,7 @@ import com.example.harudam.ui.screens.SignUpScreen
 import com.example.harudam.viewmodel.AuthViewModel
 import com.example.harudam.ui.screens.TripInfoInputScreen
 import com.example.harudam.ui.screens.TripScheduleScreen
+import com.example.harudam.ui.screens.ResultScreen
 
 private object Routes {
     const val LOGIN = "login"
@@ -24,6 +25,7 @@ private object Routes {
     const val HOME = "home"
     const val CREATE_TRIP = "create_trip"
     const val TRIP_SCHEDULE = "trip_schedule"
+    const val RESULT = "result"
 }
 
 @Composable
@@ -203,7 +205,7 @@ fun AppNavGraph() {
                     navController.navigate(Routes.CREATE_TRIP)
                 },
                 onTripClick = {
-                    navController.navigate(Routes.TRIP_SCHEDULE)
+                    navController.navigate(Routes.RESULT)
                 },
                 onLogoutClick = {
                     repository.logout()
@@ -230,16 +232,32 @@ fun AppNavGraph() {
                 onBackClick = {
                     navController.popBackStack()
                 },
-                onConfirmPlacesClick = {
-                    navController.navigate(Routes.TRIP_SCHEDULE)
-                },
+                onConfirmClick = {
+                    navController.navigate(Routes.RESULT)
+                }
             )
         }
+
 
         composable(Routes.TRIP_SCHEDULE) {
             TripScheduleScreen(
                 onBackClick = {
                     navController.popBackStack()
+                },
+                onConfirmClick = {
+                    navController.navigate(Routes.RESULT)
+                }
+            )
+        }
+
+        // ResultScreen 화면 등록
+        composable(Routes.RESULT) {
+            ResultScreen(
+                onBackClick = {
+                    navController.popBackStack(
+                        Routes.HOME,
+                        inclusive = false
+                    )
                 }
             )
         }
