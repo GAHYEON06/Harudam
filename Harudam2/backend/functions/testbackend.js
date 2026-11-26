@@ -170,6 +170,27 @@ async function main() {
   console.log("통과: 파싱 fixture 결과를 기존 addPlace로 저장·재조회");
 
   console.log("통과: 장소 두 개 추가");
+  const batch = write("addPlaces", tripId, version, { places: [
+    { name: "장소 A", sourceUrl: "https://example.com/a" },
+    { name: "장소 B", sourceUrl: "https://example.com/b" }
+  ] });
+  result = await call(userA, batch);
+  assert.equal(result.placeIds.length, 2);
+  assert.equal(result.version, version + 1);
+  assert.deepEqual(await call(userA, batch), result);
+  version = result.version;
+  for (const [token, places, code] of [
+    [userA, [{name:"중복",sourceUrl:"https://example.com/a"}], "ALREADY_EXISTS"],
+    [userA, [{name:"정상"},{name:""}], "INVALID_ARGUMENT"],
+    [userB, [{name:"권한 없음"}], "PERMISSION_DENIED"]
+  ]) {
+    await assert.rejects(() => call(token, write("addPlaces", tripId, version, {places})), e => e.code === code);
+  }
+  const afterBatch = await call(userA, {action:"getTrip",tripId});
+  assert.equal(afterBatch.places.length, 4);
+  assert.equal(afterBatch.version, version);
+  console.log("통과: 일괄 저장, 재시도, 중복 및 원자성 검증");
+
 
   result = await call(
     userA,
