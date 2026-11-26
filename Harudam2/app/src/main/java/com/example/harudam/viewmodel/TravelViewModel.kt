@@ -5,6 +5,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.harudam.model.TravelPlace
+import com.example.harudam.repository.PlaceImportBatch
+import com.example.harudam.repository.PlaceImportRepository
+import com.example.harudam.repository.toAddPlacesInput
 import com.example.harudam.model.TravelTrip
 import com.example.harudam.repository.TripRepository
 import com.google.firebase.functions.FirebaseFunctionsException
@@ -14,6 +18,7 @@ import java.util.UUID
 
 class TravelViewModel : ViewModel() {
     private val repository = TripRepository()
+    private val importer = PlaceImportRepository(repository)
     var trips by mutableStateOf<List<TravelTrip>>(emptyList()); private set
     var selected by mutableStateOf<TravelTrip?>(null); private set
     var busy by mutableStateOf(false); private set
@@ -27,6 +32,22 @@ class TravelViewModel : ViewModel() {
     fun reset() { trips = emptyList(); selected = null; discardRetry() }
     fun loadTrips() = runRead { trips = repository.listTrips() }
     fun openTrip(id: String, onSuccess: () -> Unit) = runRead { selected = repository.getTrip(id); onSuccess() }
+    fun previewPlaces(urls: List<String>, onResult: (PlaceImportBatch) -> Unit) {
+        if (busy || retryAvailable) return
+        if (urls.size !in 1..10 || urls.any { it.isBlank() || it.trim().length > 500 }) {
+            message = "지도 링크는 1~10개, 각각 500자 이하로 입력해 주세요."
+            return
+        }
+        runRead { onResult(importer.preview(urls)) }
+    }
+    fun saveImportedPlaces(places: List<TravelPlace>, onSuccess: () -> Unit = {}) {
+        if (busy || retryAvailable) return
+        if (selected == null || places.size !in 1..10) {
+            message = "여행을 선택하고 장소 1~10개를 확인해 주세요."
+            return
+        }
+        change("addPlaces", mapOf("places" to places.map { it.toAddPlacesInput() }), onSuccess)
+    }
     fun refresh() = runRead {
         selected?.let { selected = repository.getTrip(it.id) }
         trips = repository.listTrips()
@@ -91,7 +112,7 @@ class TravelViewModel : ViewModel() {
             FirebaseFunctionsException.Code.PERMISSION_DENIED -> "이 여행에 접근할 권한이 없어요."
             FirebaseFunctionsException.Code.ABORTED -> "다른 수정이 반영됐어요. 최신 내용을 불러왔으니 다시 확인해 주세요."
             FirebaseFunctionsException.Code.NOT_FOUND -> "여행 또는 장소가 없어요. 배포와 목록을 확인하고 새로고침해 주세요."
-            FirebaseFunctionsException.Code.INVALID_ARGUMENT, FirebaseFunctionsException.Code.FAILED_PRECONDITION,
+            FirebaseFunctionsException.Code.ALREADY_EXISTS, FirebaseFunctionsException.Code.INVALID_ARGUMENT, FirebaseFunctionsException.Code.FAILED_PRECONDITION,
             FirebaseFunctionsException.Code.RESOURCE_EXHAUSTED -> e.message ?: "입력 내용을 확인해 주세요."
             else -> "서버에 연결하지 못했어요. 인터넷과 함수 배포 상태를 확인해 주세요."
         }
