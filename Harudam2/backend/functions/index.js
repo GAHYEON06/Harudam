@@ -300,6 +300,7 @@ const WRITE_ACTIONS = new Set([
   "updateTrip",
   "deleteTrip",
   "addPlace",
+  "addPlaces",
   "updatePlace",
   "deletePlace",
   "confirmPlaces",
@@ -523,6 +524,33 @@ exports.travelApi = onCall(
 
             trip.placesConfirmed = false;
             result = { placeId };
+            break;
+          }
+
+          case "addPlaces": {
+            if (!Array.isArray(data.places) || data.places.length < 1 || data.places.length > 10) {
+              fail("invalid-argument", "places에는 1~10개 장소를 보내 주세요.");
+            }
+            const entries = data.places.map((raw) => {
+              if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+                fail("invalid-argument", "각 장소는 객체 형식이어야 해요.");
+              }
+              return normalizePlace(raw);
+            });
+            if (trip.places.length + entries.length > MAX_PLACES) {
+              fail("resource-exhausted", "여행당 장소는 최대 100개까지 저장할 수 있어요.");
+            }
+            const seen = new Set(trip.places.map(p => p.sourceUrl).filter(Boolean));
+            for (const p of entries) {
+              if (p.sourceUrl && seen.has(p.sourceUrl)) fail("already-exists", "이미 담긴 장소 링크가 포함돼 있어요.");
+              if (p.sourceUrl) seen.add(p.sourceUrl);
+            }
+            const placeIds = entries.map(() => randomUUID());
+            entries.forEach((p, i) => trip.places.push({
+              id: placeIds[i], ...p, visitDate: null, visitOrder: null, visitTime: null, note: "",
+            }));
+            trip.placesConfirmed = false;
+            result = { placeIds };
             break;
           }
 
