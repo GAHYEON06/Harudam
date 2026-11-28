@@ -5,6 +5,7 @@ import android.app.TimePickerDialog
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -29,27 +30,38 @@ import com.example.harudam.viewmodel.TravelViewModel
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
-private val Navy = Color(0xFF294577)
-private val Pale = Color(0xFFEEF3FB)
-private val Background = Color(0xFFF7F8FA)
+private val Mint = Color(0xFFA0E8CB)
+private val Green = Color(0xFF4A8C76)
+private val Pale = Color(0xFFC7F9E5)
+private val Background = Color(0xFFFBF9F4)
+private val Brown = Color(0xFF554239)
+private val Subtext = Color(0xFF7D6A60)
+private val Border = Color(0xFFECE5DC)
 
 @Composable
 fun TravelFlow(vm: TravelViewModel, onLogout: () -> Unit) {
+    MaterialTheme(colorScheme = lightColorScheme(primary = Green, onPrimary = Color.White, primaryContainer = Mint, onPrimaryContainer = Brown, secondary = Green, secondaryContainer = Pale, onSecondaryContainer = Brown, background = Background, onBackground = Brown, surface = Color.White, onSurface = Brown, onSurfaceVariant = Subtext, outline = Border)) {
+        TravelFlowContent(vm, onLogout)
+    }
+}
+
+@Composable
+private fun TravelFlowContent(vm: TravelViewModel, onLogout: () -> Unit) {
     var page by rememberSaveable { mutableStateOf("list") }
     var formOpen by rememberSaveable { mutableStateOf(false) }
     var editTrip by rememberSaveable { mutableStateOf(false) }
     var deleting by remember { mutableStateOf<TravelTrip?>(null) }
     LaunchedEffect(Unit) { vm.loadTrips() }
     BackHandler(enabled = page != "list" && !vm.busy && !formOpen) { page = "list" }
-    Surface(color = Background, modifier = Modifier.fillMaxSize()) {
+    Surface(color = Background, contentColor = Brown, modifier = Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 TextButton(enabled = !vm.busy, onClick = {
                     if(page == "list") { vm.reset(); onLogout() } else page = "list"
-                }) { Text(if(page == "list") "로그아웃" else "‹ 여행 목록", color = Navy) }
-                TextButton(enabled = !vm.busy && !vm.retryAvailable, onClick = { if(page=="list") vm.loadTrips() else vm.refresh() }) { Text("새로고침", color = Navy) }
+                }) { Text(if(page == "list") "로그아웃" else "‹ 여행 목록", color = Green) }
+                TextButton(enabled = !vm.busy && !vm.retryAvailable, onClick = { if(page=="list") vm.loadTrips() else vm.refresh() }) { Text("새로고침", color = Green) }
             }
-            if(vm.busy) LinearProgressIndicator(Modifier.fillMaxWidth(), color = Navy)
+            if(vm.busy) LinearProgressIndicator(Modifier.fillMaxWidth(), color = Green)
             vm.message?.let { message ->
                 Card(colors = CardDefaults.cardColors(containerColor = Pale), modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
                     Column(Modifier.padding(12.dp)) {
@@ -65,17 +77,17 @@ fun TravelFlow(vm: TravelViewModel, onLogout: () -> Unit) {
             if(page == "list" || vm.selected == null) {
                 Row(Modifier.fillMaxWidth().padding(vertical=16.dp), horizontalArrangement=Arrangement.SpaceBetween, verticalAlignment=Alignment.CenterVertically) {
                     Text("여행 목록", fontSize=27.sp, fontWeight=FontWeight.Bold)
-                    Button(enabled=enabled, onClick={ editTrip=false; formOpen=true }, colors=ButtonDefaults.buttonColors(containerColor=Navy)) { Text("+ 새 여행") }
+                    Button(enabled=enabled, onClick={ editTrip=false; formOpen=true }, colors=ButtonDefaults.buttonColors(containerColor=Mint, contentColor=Brown)) { Text("+ 새 여행") }
                 }
                 if(vm.trips.isEmpty() && !vm.busy) Text("아직 만든 여행이 없어요. + 새 여행을 눌러 시작하세요.", modifier=Modifier.padding(vertical=24.dp))
                 LazyColumn(verticalArrangement=Arrangement.spacedBy(14.dp), contentPadding=PaddingValues(bottom=24.dp)) {
                     items(vm.trips, key={it.id}) { trip ->
-                        Card(shape=RoundedCornerShape(18.dp), colors=CardDefaults.cardColors(containerColor=Color.White), modifier=Modifier.fillMaxWidth()) {
+                        Card(shape=RoundedCornerShape(18.dp), colors=CardDefaults.cardColors(containerColor=Color.White), border=BorderStroke(1.dp, Border), modifier=Modifier.fillMaxWidth()) {
                             Row(Modifier.padding(16.dp), verticalAlignment=Alignment.CenterVertically) {
                                 Column(Modifier.weight(1f).clickable(enabled=enabled) {
                                     vm.openTrip(trip.id) { page=if(vm.selected?.placesConfirmed==true) "itinerary" else "places" }
                                 }) {
-                                    Text("${trip.startDate} ~ ${trip.endDate}", color=Navy, fontSize=12.sp)
+                                    Text("${trip.startDate} ~ ${trip.endDate}", color=Green, fontSize=12.sp)
                                     Text(trip.title, fontSize=20.sp, fontWeight=FontWeight.SemiBold, modifier=Modifier.padding(vertical=8.dp))
                                     Text("장소 ${trip.placeCount}개 · ${if(trip.placesConfirmed) "장소 확정" else "계획 중"}", fontSize=13.sp)
                                     TextButton(enabled=enabled,onClick={vm.openTrip(trip.id){page=if(vm.selected?.placesConfirmed==true) "itinerary" else "places"}}) { Text("여행 열기") }
@@ -87,14 +99,14 @@ fun TravelFlow(vm: TravelViewModel, onLogout: () -> Unit) {
                 }
             } else {
                 val trip=vm.selected!!
-                Text("${trip.startDate} ~ ${trip.endDate}", fontSize=13.sp, color=Navy)
+                Text("${trip.startDate} ~ ${trip.endDate}", fontSize=13.sp, color=Green)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement=Arrangement.SpaceBetween, verticalAlignment=Alignment.CenterVertically) {
                     Text(trip.title, fontSize=24.sp, fontWeight=FontWeight.Bold, modifier=Modifier.weight(1f))
                     TextButton(enabled=enabled,onClick={editTrip=true;formOpen=true}) { Text("여행 수정") }
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement=Arrangement.spacedBy(4.dp)) {
                     listOf("places" to "장소", "assign" to "날짜 배치", "itinerary" to "일정 보기").forEach { (value,label) ->
-                        TextButton(enabled=enabled,onClick={page=value}) { Text(label, color=if(page==value) Navy else Color.Gray, fontWeight=if(page==value) FontWeight.Bold else FontWeight.Normal) }
+                        TextButton(enabled=enabled,onClick={page=value}) { Text(label, color=if(page==value) Green else Subtext, fontWeight=if(page==value) FontWeight.Bold else FontWeight.Normal) }
                     }
                 }
                 when(page) {
@@ -172,7 +184,7 @@ private fun DateAssignments(trip: TravelTrip, enabled: Boolean, vm: TravelViewMo
                         Text("${ChronoUnit.DAYS.between(LocalDate.parse(trip.startDate),LocalDate.parse(date))+1}일차 · $date",fontWeight=FontWeight.Bold)
                         TextButton(enabled=enabled,onClick={targetDate=date}) {Text("추가하기")}
                     }
-                    if(trip.placesOn(date).isEmpty()) Text("아직 담은 장소가 없습니다",modifier=Modifier.padding(12.dp),color=Color.Gray)
+                    if(trip.placesOn(date).isEmpty()) Text("아직 담은 장소가 없습니다",modifier=Modifier.padding(12.dp),color=Subtext)
                     trip.placesOn(date).forEach { place ->
                         PlaceCard(place) {
                             Row {
@@ -184,7 +196,7 @@ private fun DateAssignments(trip: TravelTrip, enabled: Boolean, vm: TravelViewMo
                     }
                 }
             }
-            item {Text("미배치 장소 ${trip.places.count{it.visitDate==null}}개",color=Navy)}
+            item {Text("미배치 장소 ${trip.places.count{it.visitDate==null}}개",color=Green)}
         }
         Primary("확정하고 일정 보기",enabled && trip.places.isNotEmpty()) {
             if(trip.placesConfirmed) onNext() else vm.change("confirmPlaces",onSuccess=onNext)
@@ -267,10 +279,10 @@ private fun Itinerary(trip: TravelTrip, enabled: Boolean, vm: TravelViewModel) {
 
 @Composable
 private fun PlaceCard(place: TravelPlace, content: @Composable ColumnScope.() -> Unit) {
-    Card(shape=RoundedCornerShape(14.dp),colors=CardDefaults.cardColors(containerColor=Color.White),modifier=Modifier.fillMaxWidth()) {
+    Card(shape=RoundedCornerShape(14.dp),colors=CardDefaults.cardColors(containerColor=Color.White),border=BorderStroke(1.dp, Border),modifier=Modifier.fillMaxWidth()) {
         Column(Modifier.padding(14.dp)) {
             Text("${place.visitOrder?.let{"$it. "}.orEmpty()}${place.name}",fontWeight=FontWeight.SemiBold,fontSize=17.sp)
-            Text(when(place.category){"FOOD"->"음식·카페";"TOUR"->"관광";"STAY"->"숙소";else->"기타"},fontSize=12.sp,color=Navy)
+            Text(when(place.category){"FOOD"->"음식·카페";"TOUR"->"관광";"STAY"->"숙소";else->"기타"},fontSize=12.sp,color=Green)
             if(place.address.isNotBlank()) Text(place.address,fontSize=13.sp)
             if(!place.visitTime.isNullOrBlank()) Text("방문 시간 ${place.visitTime}",fontSize=13.sp)
             if(place.note.isNotBlank()) Text(place.note,fontSize=14.sp,modifier=Modifier.padding(top=6.dp))
@@ -281,7 +293,7 @@ private fun PlaceCard(place: TravelPlace, content: @Composable ColumnScope.() ->
 
 @Composable
 private fun Primary(label:String,enabled:Boolean,onClick:()->Unit) {
-    Button(onClick=onClick,enabled=enabled,modifier=Modifier.fillMaxWidth().heightIn(min=52.dp),shape=RoundedCornerShape(14.dp),colors=ButtonDefaults.buttonColors(containerColor=Navy)){Text(label)}
+    Button(onClick=onClick,enabled=enabled,modifier=Modifier.fillMaxWidth().heightIn(min=52.dp),shape=RoundedCornerShape(14.dp),colors=ButtonDefaults.buttonColors(containerColor=Mint, contentColor=Brown)){Text(label)}
 }
 
 @Composable
