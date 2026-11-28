@@ -2,23 +2,24 @@ package com.example.harudam.repository
 
 import com.example.harudam.model.TravelTrip
 import com.example.harudam.model.toTravelTrip
-import com.google.firebase.functions.FirebaseFunctions
-import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
+import com.google.firebase.FirebaseApp
+import com.google.firebase.auth.FirebaseAuth
+import com.example.harudam.BuildConfig
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 class TripRepository {
-    private val functions = FirebaseFunctions.getInstance("asia-northeast3")
-    suspend fun call(data: Map<String, Any?>): Map<*, *> = suspendCancellableCoroutine { continuation ->
-        functions.getHttpsCallable("travelApi").call(data)
-            .addOnSuccessListener { result ->
-                if (continuation.isActive) {
-                    val map = result.data as? Map<*, *>
-                    if (map == null) continuation.resumeWithException(IllegalStateException("서버 응답 형식을 확인해 주세요."))
-                    else continuation.resume(map)
-                }
-            }
-            .addOnFailureListener { if (continuation.isActive) continuation.resumeWithException(it) }
+    companion object {
+        @Volatile private var database: LocalTravelStore? = null
+        private fun store(): LocalTravelStore = database ?: synchronized(this) {
+            database ?: LocalTravelStore(FirebaseApp.getInstance().applicationContext,
+                if (BuildConfig.DEBUG && BuildConfig.USE_FIREBASE_EMULATORS) "harudam-demo.db" else "harudam.db")
+                .also { database = it }
+        }
+    }
+    suspend fun call(data: Map<String, Any?>): Map<*, *> {
+        val uid = FirebaseAuth.getInstance().currentUser?.uid
+        return withContext(Dispatchers.IO) { store().call(uid, data) }
     }
     suspend fun listTrips(): List<TravelTrip> {
         val trips = mutableListOf<TravelTrip>()

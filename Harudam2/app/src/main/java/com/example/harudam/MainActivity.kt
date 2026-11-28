@@ -33,8 +33,8 @@ class MainActivity : ComponentActivity() {
                             .safeDrawingPadding()
                     ) {
                         Column {
-                            if (BuildConfig.DEBUG && BuildConfig.USE_FIREBASE_EMULATORS) {
-                                androidx.compose.material3.Text("로컬 테스트 · 운영 데이터와 분리됨",
+                            run {
+                                androidx.compose.material3.Text(if (BuildConfig.DEBUG && BuildConfig.USE_FIREBASE_EMULATORS) "테스트 계정 · 이 기기에 저장" else "이 기기에 저장 · 기기 간 동기화 없음",
                                     modifier = Modifier.fillMaxWidth(),
                                     style = androidx.compose.material3.MaterialTheme.typography.labelSmall)
                             }

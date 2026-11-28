@@ -11,6 +11,7 @@ import com.example.harudam.repository.toAddPlacesInput
 import com.example.harudam.model.TravelTrip
 import com.example.harudam.model.TravelPlace
 import com.example.harudam.repository.TripRepository
+import com.example.harudam.repository.LocalTravelException
 import com.google.firebase.functions.FirebaseFunctionsException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -109,7 +110,7 @@ class TravelViewModel : ViewModel() {
                 success?.invoke()
             } catch(e: CancellationException) { throw e }
             catch(e: Exception) {
-                val code = (e as? FirebaseFunctionsException)?.code
+                val code = (e as? LocalTravelException)?.code ?: (e as? FirebaseFunctionsException)?.code
                 if(!saved && (code == FirebaseFunctionsException.Code.UNAVAILABLE || code == FirebaseFunctionsException.Code.DEADLINE_EXCEEDED || code == FirebaseFunctionsException.Code.INTERNAL)) {
                     retryAvailable = true
                     message = "저장 결과를 확인하지 못했어요. 같은 요청으로 재시도하거나 최신 내용을 다시 확인해 주세요."
@@ -125,6 +126,9 @@ class TravelViewModel : ViewModel() {
         }
     }
     private fun errorText(error: Exception): String {
+        if (error is LocalTravelException) return error.message ?: "기기 저장 요청을 처리하지 못했어요."
+        if (error is android.database.sqlite.SQLiteFullException) return "기기 저장 공간이 부족해요. 공간을 확보한 뒤 다시 시도해 주세요."
+        if (error is android.database.sqlite.SQLiteException) return "기기 데이터를 읽거나 저장하지 못했어요. 다시 시도해 주세요."
         val e = error as? FirebaseFunctionsException ?: return "연결을 확인하고 다시 시도해 주세요."
         return when(e.code) {
             FirebaseFunctionsException.Code.UNAUTHENTICATED -> "로그인이 만료됐어요. 로그아웃 후 다시 로그인해 주세요."

@@ -277,7 +277,7 @@ fun TripInfoInputScreen(
                         manualLatitude != null && manualLongitude != null, manualAddress.trim()))
                     manualUrl = null
                     placeListUrl = ""
-                    placeUrlMessage = "장소를 추가했어요. 확정하면 서버에 저장됩니다."
+                    placeUrlMessage = "장소를 추가했어요. 확정하면 이 기기에 저장됩니다."
                 }) { Text("추가") } },
                 dismissButton = { TextButton(onClick = { manualUrl = null }) { Text("취소") } },
             )

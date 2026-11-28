@@ -6,7 +6,8 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.android.gms.tasks.Tasks
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.functions.FirebaseFunctions
+import com.example.harudam.repository.TripRepository
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -35,8 +36,8 @@ class LocalTravelUiTest {
         org.junit.Assert.assertEquals("demo-harudam", com.google.firebase.FirebaseApp.getInstance().options.projectId)
         val auth = FirebaseAuth.getInstance()
         Tasks.await(auth.createUserWithEmailAndPassword("ui-${UUID.randomUUID()}@example.test", "UiTest123!"), 30, TimeUnit.SECONDS)
-        val api = FirebaseFunctions.getInstance("asia-northeast3").getHttpsCallable("travelApi")
-        fun call(data: Map<String, Any?>) = Tasks.await(api.call(data), 30, TimeUnit.SECONDS).data as Map<*, *>
+        val api = TripRepository()
+        fun call(data: Map<String, Any?>) = runBlocking { api.call(data) }
         val created = call(mapOf("action" to "createTrip", "requestId" to UUID.randomUUID().toString(),
             "title" to "저장된 UI 여행", "startDate" to "2026-12-01", "endDate" to "2026-12-02",
             "places" to listOf(mapOf("name" to "실제 저장 장소", "address" to "서울 확인 주소", "category" to "TOUR"))))

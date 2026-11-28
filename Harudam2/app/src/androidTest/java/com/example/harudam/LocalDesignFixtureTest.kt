@@ -3,7 +3,8 @@ package com.example.harudam
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.android.gms.tasks.Tasks
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.functions.FirebaseFunctions
+import com.example.harudam.repository.TripRepository
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -24,9 +25,9 @@ class LocalDesignFixtureTest {
         val auth = FirebaseAuth.getInstance()
         Tasks.await(auth.createUserWithEmailAndPassword(email, "LocalFixture123!"), 30, TimeUnit.SECONDS)
         assertNotNull(auth.currentUser)
-        val api = FirebaseFunctions.getInstance("asia-northeast3").getHttpsCallable("travelApi")
+        val api = TripRepository()
         fun call(data: Map<String, Any?>): Map<*, *> =
-            Tasks.await(api.call(data), 30, TimeUnit.SECONDS).data as Map<*, *>
+            runBlocking { api.call(data) }
 
         data class Reference(val title: String, val start: String, val end: String, val count: Int)
         val references = listOf(
