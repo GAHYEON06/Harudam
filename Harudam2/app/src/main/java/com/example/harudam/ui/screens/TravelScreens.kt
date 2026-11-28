@@ -367,3 +367,22 @@ private fun ScheduleForm(place:TravelPlace,trip:TravelTrip,enabled:Boolean,onDis
         if(date<trip.startDate || date>trip.endDate)error="여행 기간 안의 날짜를 선택해 주세요." else onSave(date,time,note.trim())
     }){Text("저장")}},dismissButton={TextButton(enabled=enabled,onClick=onDismiss){Text("취소")}})
 }
+
+/** Editing uses the same authenticated, versioned API as the FE schedule screen. */
+@Composable
+fun TripManagementScreen(trip: TravelTrip, enabled: Boolean, vm: TravelViewModel, onBack: () -> Unit) {
+    var editingTrip by rememberSaveable { mutableStateOf(false) }
+    Surface(color = Background, modifier = Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize().padding(20.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                TextButton(enabled = enabled, onClick = onBack) { Text("‹ 일정으로") }
+                TextButton(enabled = enabled, onClick = { editingTrip = true }) { Text("여행 수정") }
+            }
+            Text(trip.title, fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Brown)
+            PlaceCollection(trip, enabled, vm, onConfirmed = onBack)
+        }
+    }
+    if(editingTrip) TripForm(trip, enabled, { editingTrip = false }) { title, start, end ->
+        vm.change("updateTrip", mapOf("title" to title, "startDate" to start, "endDate" to end)) { editingTrip = false }
+    }
+}

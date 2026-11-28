@@ -5,11 +5,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.harudam.model.TravelPlace
 import com.example.harudam.repository.PlaceImportBatch
 import com.example.harudam.repository.PlaceImportRepository
 import com.example.harudam.repository.toAddPlacesInput
 import com.example.harudam.model.TravelTrip
+import com.example.harudam.model.TravelPlace
 import com.example.harudam.repository.TripRepository
 import com.google.firebase.functions.FirebaseFunctionsException
 import kotlinx.coroutines.CancellationException
@@ -31,6 +31,23 @@ class TravelViewModel : ViewModel() {
     fun discardRetry() { pending = null; pendingSuccess = null; retryAvailable = false; message = null }
     fun reset() { trips = emptyList(); selected = null; discardRetry() }
     fun loadTrips() = runRead { trips = repository.listTrips() }
+    suspend fun parsePlaceUrl(url: String): TravelPlace {
+        try {
+            val response = repository.call(mapOf("action" to "parsePlaces", "url" to url))
+            val result = (response["results"] as? List<*>)?.firstOrNull() as? Map<*, *>
+                ?: throw IllegalStateException("장소 정보를 확인하지 못했어요.")
+            if(result["status"] != "success") {
+                val error = result["error"] as? Map<*, *>
+                throw IllegalStateException(error?.get("message") as? String ?: "장소 이름과 주소를 직접 입력해 주세요.")
+            }
+            val place = result["place"] as? Map<*, *> ?: throw IllegalStateException("장소 정보를 확인하지 못했어요.")
+            return TravelPlace(UUID.randomUUID().toString(), place["name"] as String,
+                address = place["address"] as? String ?: "", category = place["category"] as? String ?: "OTHER",
+                sourceUrl = url, latitude = (place["latitude"] as? Number)?.toDouble(),
+                longitude = (place["longitude"] as? Number)?.toDouble())
+        } catch(e: CancellationException) { throw e }
+        catch(e: FirebaseFunctionsException) { throw IllegalStateException(errorText(e), e) }
+    }
     fun openTrip(id: String, onSuccess: () -> Unit) = runRead { selected = repository.getTrip(id); onSuccess() }
     fun previewPlaces(urls: List<String>, onResult: (PlaceImportBatch) -> Unit) {
         if (busy || retryAvailable) return
@@ -62,6 +79,8 @@ class TravelViewModel : ViewModel() {
     }
     fun createTrip(title: String, start: String, end: String, onSuccess: () -> Unit) = write(
         "createTrip", mapOf("title" to title.trim(), "startDate" to start, "endDate" to end), false, onSuccess)
+    fun createPlan(title: String, start: String, end: String, places: List<Map<String, Any?>>, onSuccess: () -> Unit) = write(
+        "createTrip", mapOf("title" to title.trim(), "startDate" to start, "endDate" to end, "places" to places), false, onSuccess)
     fun change(action: String, data: Map<String, Any?> = emptyMap(), onSuccess: () -> Unit = {}) = write(action, data, true, onSuccess)
     private fun write(action: String, extra: Map<String, Any?>, existing: Boolean, onSuccess: () -> Unit) {
         if(busy || retryAvailable) return

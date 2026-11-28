@@ -366,6 +366,26 @@ async function main() {
   );
 
   console.log("통과: 여행 삭제");
+  const planRequest = {
+    action: "createTrip", requestId: randomUUID(), title: "FE 디자인 연결 시험",
+    startDate: "2026-12-01", endDate: "2026-12-03",
+    places: [{ name: "직접 확인한 장소", category: "TOUR", address: "확인한 주소", sourceUrl: "https://naver.me/example", latitude: null, longitude: null }],
+  };
+  const plan = await call(userA, planRequest);
+  const savedPlan = await call(userA, { action: "getTrip", tripId: plan.tripId });
+  assert.equal(savedPlan.placesConfirmed, true);
+  assert.equal(savedPlan.unscheduledPlaces.length, 1);
+  assert.equal(savedPlan.places[0].name, "직접 확인한 장소");
+  assert.equal(savedPlan.places[0].address, "확인한 주소");
+  assert.equal(savedPlan.places[0].latitude, null);
+  assert.equal(savedPlan.places[0].sourceUrl, "https://naver.me/example");
+  assert.deepEqual(await call(userA, planRequest), plan);
+  for (const places of [[{ name: "" }], [null], "invalid", Array(101).fill({ name: "장소" })]) {
+    await assert.rejects(() => call(userA, { ...planRequest, requestId: randomUUID(), places }),
+      (error) => error.code === "INVALID_ARGUMENT");
+  }
+  await call(userA, write("deleteTrip", plan.tripId, 1));
+  console.log("통과: FE 확정 버튼의 여행·장소 일괄 저장, 재전송, 잘못된 장소 거부");
   console.log("모든 테스트 완료");
 }
 

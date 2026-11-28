@@ -1,0 +1,775 @@
+package com.example.harudam.ui.screens
+
+import android.app.DatePickerDialog
+import android.net.Uri
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
+import com.example.harudam.model.TravelPlace
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
+
+private val CreateMint = Color(0xFFA0E8CB)
+private val CreateMintLight = Color(0xFFC7F9E5)
+private val CreateIvory = Color(0xFFFBF9F4)
+private val CreateText = Color(0xFF554239)
+private val CreateSubtext = Color(0xFF7D6A60)
+private val CreateBorder = Color(0xFFECE5DC)
+
+data class ImportedPlaceUi(
+    val id: String,
+    val name: String,
+    val category: String,
+    val latitude: Double,
+    val longitude: Double,
+    val sourceUrl: String = "",
+    val hasCoordinates: Boolean = true,
+    val address: String = "",
+)
+
+private val mockPlaces = listOf(
+    ImportedPlaceUi("mock-1", "초량밀면", "음식·카페", 35.1150, 129.0400),
+    ImportedPlaceUi("mock-2", "코이", "음식·카페", 35.1510, 129.1130),
+    ImportedPlaceUi("mock-3", "광안리해수욕장", "관광", 35.1532, 129.1187),
+)
+
+/** Figma screen 2: 여행 이름과 여행 기간을 입력합니다. */
+@Composable
+fun TripInfoInputScreen(
+    onBackClick: () -> Unit = {},
+    onConfirmPlacesClick: () -> Unit = {},
+    onAddUrlClick: (String) -> Unit = {},
+    onSaveTrip: ((String, String, String, List<ImportedPlaceUi>) -> Unit)? = null,
+    onParseUrl: (suspend (String) -> TravelPlace)? = null,
+) {
+    var manualUrl by remember { mutableStateOf<String?>(null) }
+    var manualName by remember { mutableStateOf("") }
+    var manualCategory by remember { mutableStateOf("기타") }
+    var manualAddress by remember { mutableStateOf("") }
+    var manualLatitude by remember { mutableStateOf<Double?>(null) }
+    var manualLongitude by remember { mutableStateOf<Double?>(null) }
+    var manualMessage by remember { mutableStateOf("") }
+    var parsing by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    var tripName by remember { mutableStateOf("") }
+    var startDateMillis by remember { mutableStateOf<Long?>(null) }
+    var endDateMillis by remember { mutableStateOf<Long?>(null) }
+    var placeListUrl by remember { mutableStateOf("") }
+    val importedPlaces = remember {
+        mutableStateListOf<ImportedPlaceUi>()
+    }
+    var deletePlaceTargetIndex by remember { mutableStateOf<Int?>(null) }
+    var placeUrlMessage by remember { mutableStateOf<String?>(null) }
+    var isPlaceUrlError by remember { mutableStateOf(false) }
+
+    val tripInfoComplete = tripName.isNotBlank() &&
+            startDateMillis != null &&
+            endDateMillis != null
+    val canConfirmPlaces = tripInfoComplete && importedPlaces.isNotEmpty() && !parsing
+
+    Surface(modifier = Modifier.fillMaxSize(), color = CreateIvory) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState()),
+        ) {
+            CreateTripHeader(onBackClick = onBackClick)
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 21.dp)
+                    .offset(y = (-31).dp),
+            ) {
+                CreateTripForm(
+                    tripName = tripName,
+                    onTripNameChange = { tripName = it },
+                    startDateMillis = startDateMillis,
+                    endDateMillis = endDateMillis,
+                    onStartDateSelected = { selectedDate ->
+                        startDateMillis = selectedDate
+                        if (endDateMillis != null && endDateMillis!! < selectedDate) {
+                            endDateMillis = null
+                        }
+                    },
+                    onEndDateSelected = { endDateMillis = it },
+                    placeListUrl = placeListUrl,
+                    onPlaceListUrlChange = {
+                        placeListUrl = it
+                        placeUrlMessage = null
+                    },
+                    onAddUrlClick = { url ->
+                        if (importedPlaces.size >= 100) {
+                            placeUrlMessage = "여행 장소는 최대 100개까지 추가할 수 있어요."
+                            isPlaceUrlError = true
+                        } else if (isValidNaverMapUrl(url)) {
+                            manualName = ""
+                            manualAddress = ""
+                            manualCategory = "기타"
+                            manualLatitude = null
+                            manualLongitude = null
+                            placeUrlMessage = "장소 정보를 확인하고 있어요."
+                            isPlaceUrlError = false
+                            onAddUrlClick(url)
+                            scope.launch {
+                                parsing = true
+                                manualMessage = "장소 이름과 주소를 직접 입력해 주세요."
+                                try {
+                                    onParseUrl?.invoke(url)?.let { place ->
+                                        manualName = place.name
+                                        manualAddress = place.address
+                                        manualCategory = when(place.category) { "FOOD" -> "음식·카페"; "TOUR" -> "관광"; "STAY" -> "숙소"; else -> "기타" }
+                                        manualLatitude = place.latitude
+                                        manualLongitude = place.longitude
+                                        manualMessage = "가져온 장소 정보를 확인한 뒤 추가해 주세요."
+                                    }
+                                } catch(e: CancellationException) { throw e }
+                                catch(e: Exception) { manualMessage = e.message ?: "장소 이름과 주소를 직접 입력해 주세요." }
+                                finally { parsing = false }
+                                placeUrlMessage = "장소 정보를 확인해 추가해 주세요."
+                                manualUrl = url
+                            }
+                        } else {
+                            placeUrlMessage = "naver.me 또는 map.naver.com 공유 링크를 입력해 주세요."
+                            isPlaceUrlError = true
+                        }
+                    },
+                    placeUrlMessage = placeUrlMessage,
+                    isPlaceUrlError = isPlaceUrlError,
+                    placesEnabled = tripInfoComplete && !parsing,
+                )
+                Spacer(Modifier.height(18.dp))
+                CreateMapPlaceholder(places = importedPlaces)
+                Spacer(Modifier.height(14.dp))
+                Text(
+                    text = "여행 장소 ${importedPlaces.size}",
+                    color = CreateText,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Spacer(Modifier.height(10.dp))
+                if (importedPlaces.isEmpty()) {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        color = Color.White,
+                        shape = RoundedCornerShape(10.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, CreateBorder),
+                    ) {
+                        Box(
+                            modifier = Modifier.padding(vertical = 14.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                "추가된 장소가 없어요",
+                                color = CreateSubtext,
+                                fontSize = 12.sp,
+                            )
+                        }
+                    }
+                } else {
+                    importedPlaces.forEachIndexed { index, place ->
+                        ImportedPlaceRow(
+                            place = place,
+                            onDeleteClick = { deletePlaceTargetIndex = index },
+                        )
+                        if (index != importedPlaces.lastIndex) {
+                            Spacer(Modifier.height(12.dp))
+                        }
+                    }
+                }
+                Spacer(Modifier.height(26.dp))
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 34.dp)
+                        .height(47.dp)
+                        .clickable(
+                            enabled = canConfirmPlaces,
+                            onClick = {
+                                if (onSaveTrip == null) onConfirmPlacesClick() else {
+                                    val format = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+                                    onSaveTrip(tripName.trim(), format.format(Date(startDateMillis!!)), format.format(Date(endDateMillis!!)), importedPlaces.toList())
+                                }
+                            },
+                        ),
+                    color = if (canConfirmPlaces) CreateMint else Color(0xFFE7E3DC),
+                    shape = RoundedCornerShape(10.dp),
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            "장소 확정하기",
+                            color = if (canConfirmPlaces) CreateText else CreateSubtext,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                }
+                Spacer(Modifier.height(24.dp))
+            }
+        }
+
+        manualUrl?.let { url ->
+            AlertDialog(
+                onDismissRequest = { manualUrl = null },
+                title = { Text("장소 이름 확인") },
+                text = {
+                    Column(Modifier.verticalScroll(rememberScrollState())) {
+                        Text(manualMessage)
+                        OutlinedTextField(value = manualName, onValueChange = { if(it.length <= 100) manualName = it }, label = { Text("장소 이름") })
+                        OutlinedTextField(value = manualAddress, onValueChange = { if(it.length <= 300) manualAddress = it }, label = { Text("주소 (선택)") })
+                        Row {
+                            listOf("음식·카페", "관광", "숙소", "기타").forEach { category ->
+                                TextButton(onClick = { manualCategory = category }) { Text(if(category == manualCategory) "✓$category" else category) }
+                            }
+                        }
+                    }
+                },
+                confirmButton = { TextButton(enabled = manualName.isNotBlank(), onClick = {
+                    importedPlaces.add(ImportedPlaceUi(java.util.UUID.randomUUID().toString(), manualName.trim(), manualCategory,
+                        manualLatitude ?: 0.0, manualLongitude ?: 0.0, url,
+                        manualLatitude != null && manualLongitude != null, manualAddress.trim()))
+                    manualUrl = null
+                    placeListUrl = ""
+                    placeUrlMessage = "장소를 추가했어요. 확정하면 서버에 저장됩니다."
+                }) { Text("추가") } },
+                dismissButton = { TextButton(onClick = { manualUrl = null }) { Text("취소") } },
+            )
+        }
+        deletePlaceTargetIndex?.let { index ->
+            val place = importedPlaces.getOrNull(index)
+            if (place != null) {
+                AlertDialog(
+                    onDismissRequest = { deletePlaceTargetIndex = null },
+                    title = { Text("장소를 삭제할까요?") },
+                    text = { Text("${place.name} 장소를 여행 목록에서 삭제해요.") },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                importedPlaces.removeAt(index)
+                                deletePlaceTargetIndex = null
+                            },
+                        ) {
+                            Text("삭제")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { deletePlaceTargetIndex = null }) {
+                            Text("취소")
+                        }
+                    },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CreateTripHeader(onBackClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(119.dp)
+            .background(CreateMint, RoundedCornerShape(bottomStart = 10.dp, bottomEnd = 10.dp)),
+    ) {
+        Row(
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(start = 16.dp, top = 34.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                "‹",
+                modifier = Modifier.clickable(onClick = onBackClick),
+                color = CreateText,
+                fontSize = 27.sp,
+                lineHeight = 27.sp,
+            )
+            Text(
+                "새 여행 만들기",
+                modifier = Modifier.padding(start = 9.dp),
+                color = CreateText,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+            )
+        }
+    }
+}
+
+@Composable
+private fun CreateTripForm(
+    tripName: String,
+    onTripNameChange: (String) -> Unit,
+    startDateMillis: Long?,
+    endDateMillis: Long?,
+    onStartDateSelected: (Long) -> Unit,
+    onEndDateSelected: (Long) -> Unit,
+    placeListUrl: String,
+    onPlaceListUrlChange: (String) -> Unit,
+    onAddUrlClick: (String) -> Unit,
+    placeUrlMessage: String?,
+    isPlaceUrlError: Boolean,
+    placesEnabled: Boolean,
+) {
+    val context = LocalContext.current
+    val dateFormatter = remember { SimpleDateFormat("yyyy.MM.dd", Locale.KOREA) }
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = Color.White,
+        shape = RoundedCornerShape(10.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, CreateBorder),
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 17.dp, vertical = 12.dp)) {
+            FormLabel("여행 이름")
+            Spacer(Modifier.height(3.dp))
+            OutlinedTextField(
+                value = tripName,
+                onValueChange = onTripNameChange,
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                placeholder = {
+                    Text("여행 이름 입력", color = CreateSubtext, fontSize = 12.sp)
+                },
+                textStyle = TextStyle(
+                    color = CreateText,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                ),
+                shape = RoundedCornerShape(10.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = CreateIvory,
+                    unfocusedContainerColor = CreateIvory,
+                    focusedBorderColor = CreateBorder,
+                    unfocusedBorderColor = CreateBorder,
+                    cursorColor = CreateText,
+                ),
+            )
+
+            Spacer(Modifier.height(8.dp))
+            FormLabel("날짜", modifier = Modifier.padding(start = 2.dp))
+            Spacer(Modifier.height(4.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                DateInputField(
+                    text = startDateMillis?.let { dateFormatter.format(Date(it)) }.orEmpty(),
+                    placeholder = "시작 날짜",
+                    modifier = Modifier.width(114.dp),
+                    onClick = {
+                        val initial = startDateMillis?.let { Calendar.getInstance().apply { timeInMillis = it } }
+                            ?: Calendar.getInstance()
+                        DatePickerDialog(
+                            context,
+                            { _, year, month, day ->
+                                val selected = Calendar.getInstance().apply {
+                                    set(year, month, day, 0, 0, 0)
+                                    set(Calendar.MILLISECOND, 0)
+                                }
+                                onStartDateSelected(selected.timeInMillis)
+                            },
+                            initial.get(Calendar.YEAR),
+                            initial.get(Calendar.MONTH),
+                            initial.get(Calendar.DAY_OF_MONTH),
+                        ).show()
+                    },
+                )
+                Text("~", color = CreateText, fontSize = 15.sp)
+                DateInputField(
+                    text = endDateMillis?.let { dateFormatter.format(Date(it)) }.orEmpty(),
+                    placeholder = "종료 날짜",
+                    modifier = Modifier.width(118.dp),
+                    onClick = {
+                        val initialMillis = endDateMillis ?: startDateMillis ?: System.currentTimeMillis()
+                        val initial = Calendar.getInstance().apply { timeInMillis = initialMillis }
+                        DatePickerDialog(
+                            context,
+                            { _, year, month, day ->
+                                val selected = Calendar.getInstance().apply {
+                                    set(year, month, day, 0, 0, 0)
+                                    set(Calendar.MILLISECOND, 0)
+                                }
+                                onEndDateSelected(selected.timeInMillis)
+                            },
+                            initial.get(Calendar.YEAR),
+                            initial.get(Calendar.MONTH),
+                            initial.get(Calendar.DAY_OF_MONTH),
+                        ).apply {
+                            startDateMillis?.let { datePicker.minDate = it }
+                        }.show()
+                    },
+                )
+            }
+
+            if (startDateMillis != null && endDateMillis == null) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = "종료 날짜는 시작 날짜 이후로 선택해 주세요.",
+                    color = CreateSubtext,
+                    fontSize = 11.sp,
+                )
+            }
+
+            Spacer(Modifier.height(8.dp))
+            FormLabel("장소 목록 URL", modifier = Modifier.padding(start = 2.dp))
+            Spacer(Modifier.height(4.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                OutlinedTextField(
+                    value = placeListUrl,
+                    onValueChange = onPlaceListUrlChange,
+                    enabled = placesEnabled,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(52.dp),
+                    singleLine = true,
+                    placeholder = {
+                        Text(
+                            text = if (placesEnabled) {
+                                "지도 목록 링크를 붙여넣으세요"
+                            } else {
+                                "여행 이름과 날짜를 먼저 입력"
+                            },
+                            color = CreateSubtext,
+                            fontSize = 12.sp,
+                        )
+                    },
+                    textStyle = TextStyle(
+                        color = CreateText,
+                        fontSize = 12.sp,
+                    ),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = Color.White,
+                        unfocusedContainerColor = Color.White,
+                        disabledContainerColor = Color(0xFFF1EEE8),
+                        focusedBorderColor = CreateBorder,
+                        unfocusedBorderColor = CreateBorder,
+                        disabledBorderColor = CreateBorder,
+                        focusedTextColor = CreateText,
+                        unfocusedTextColor = CreateText,
+                        disabledTextColor = CreateSubtext,
+                        cursorColor = CreateText,
+                    ),
+                )
+
+                val canAddUrl = placesEnabled && placeListUrl.isNotBlank()
+                Surface(
+                    modifier = Modifier
+                        .size(width = 58.dp, height = 52.dp)
+                        .clickable(
+                            enabled = canAddUrl,
+                            onClick = { onAddUrlClick(placeListUrl.trim()) },
+                        ),
+                    color = if (canAddUrl) CreateMintLight else Color(0xFFE7E3DC),
+                    shape = RoundedCornerShape(9.dp),
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            text = "추가",
+                            color = if (canAddUrl) CreateText else CreateSubtext,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                }
+            }
+            placeUrlMessage?.let { message ->
+                Spacer(Modifier.height(5.dp))
+                Text(
+                    text = message,
+                    color = if (isPlaceUrlError) Color(0xFFB3261E) else CreateSubtext,
+                    fontSize = 11.sp,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun FormLabel(text: String, modifier: Modifier = Modifier) {
+    Text(text, modifier = modifier.padding(start = 9.dp), color = CreateSubtext, fontSize = 12.sp)
+}
+
+@Composable
+private fun DateInputField(
+    text: String,
+    placeholder: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    Surface(
+        modifier = modifier
+            .height(43.dp)
+            .clickable(onClick = onClick),
+        color = CreateIvory,
+        shape = RoundedCornerShape(10.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, CreateBorder),
+    ) {
+        Box(modifier = Modifier.padding(horizontal = 12.dp), contentAlignment = Alignment.CenterStart) {
+            Text(
+                text = text.ifEmpty { placeholder },
+                color = if (text.isEmpty()) CreateSubtext else CreateText,
+                fontSize = 12.sp,
+                fontWeight = if (text.isEmpty()) FontWeight.Normal else FontWeight.SemiBold,
+            )
+        }
+    }
+}
+
+@Composable
+private fun CreateMapPlaceholder(places: List<ImportedPlaceUi>) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(160.dp)
+            .background(Color.White, RoundedCornerShape(10.dp))
+            .padding(1.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = CreateIvory,
+            shape = RoundedCornerShape(10.dp),
+            border = androidx.compose.foundation.BorderStroke(1.dp, CreateBorder),
+        ) {
+            if (places.isNotEmpty()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Text(
+                        text = "여행 장소 미리보기 · 지도 연동 전",
+                        color = CreateSubtext,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    places.take(3).forEachIndexed { index, place ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(32.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(22.dp)
+                                    .background(CreateMintLight, CircleShape),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    text = (index + 1).toString(),
+                                    color = CreateText,
+                                    fontSize = 11.sp,
+                                )
+                            }
+                            Text(
+                                text = place.name,
+                                modifier = Modifier
+                                    .padding(start = 7.dp)
+                                    .weight(1f),
+                                color = CreateText,
+                                fontSize = 11.sp,
+                                maxLines = 1,
+                            )
+                            Text(
+                                text = if (!place.hasCoordinates) "좌표 미등록" else String.format(
+                                    Locale.US,
+                                    "%.4f, %.4f",
+                                    place.latitude,
+                                    place.longitude,
+                                ),
+                                color = CreateSubtext,
+                                fontSize = 10.sp,
+                            )
+                        }
+                    }
+                }
+            } else {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .fillMaxSize()
+                        .padding(horizontal = 20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+
+                    Spacer(Modifier.height(9.dp))
+                    Text(
+                        text = "지도에 표시할 장소가 없어요",
+                        color = CreateText,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "장소 목록 URL을 추가하면 여기에 표시돼요.",
+                        color = CreateSubtext,
+                        fontSize = 11.sp,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ImportedPlaceRow(
+    place: ImportedPlaceUi,
+    onDeleteClick: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().height(47.dp),
+        color = Color.White,
+        shape = RoundedCornerShape(10.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, CreateBorder),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 9.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("♧", color = Color(0xFF8AAE9A), fontSize = 20.sp)
+            Text(place.name, modifier = Modifier.padding(start = 9.dp).weight(1f), color = CreateText, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            CategoryTag(place.category)
+            IconButton(
+                onClick = onDeleteClick,
+                modifier = Modifier.size(36.dp),
+            ) {
+                PlaceDeleteIcon(modifier = Modifier.size(16.dp))
+            }
+        }
+    }
+}
+
+private fun isValidNaverMapUrl(rawUrl: String): Boolean {
+    val uri = runCatching { Uri.parse(rawUrl.trim()) }.getOrNull() ?: return false
+    val scheme = uri.scheme?.lowercase(Locale.ROOT)
+    val host = uri.host?.lowercase(Locale.ROOT) ?: return false
+    val isHttpUrl = scheme == "http" || scheme == "https"
+    val isNaverHost = host == "naver.me" ||
+            host == "naver.com" ||
+            host.endsWith(".naver.com")
+    val hasPathOrQuery = !uri.path.isNullOrBlank() || !uri.query.isNullOrBlank()
+
+    return isHttpUrl && isNaverHost && hasPathOrQuery
+}
+
+@Composable
+private fun PlaceDeleteIcon(modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier) {
+        val stroke = 1.6.dp.toPx()
+        val left = size.width * 0.24f
+        val top = size.height * 0.29f
+        val bodyWidth = size.width * 0.52f
+        val bodyHeight = size.height * 0.57f
+
+        drawRoundRect(
+            color = CreateSubtext,
+            topLeft = Offset(left, top),
+            size = Size(bodyWidth, bodyHeight),
+            cornerRadius = CornerRadius(1.dp.toPx()),
+            style = androidx.compose.ui.graphics.drawscope.Stroke(width = stroke),
+        )
+        drawLine(
+            color = CreateSubtext,
+            start = Offset(size.width * 0.17f, size.height * 0.23f),
+            end = Offset(size.width * 0.83f, size.height * 0.23f),
+            strokeWidth = stroke,
+        )
+        drawLine(
+            color = CreateSubtext,
+            start = Offset(size.width * 0.39f, size.height * 0.15f),
+            end = Offset(size.width * 0.61f, size.height * 0.15f),
+            strokeWidth = stroke,
+        )
+        drawLine(
+            color = CreateSubtext,
+            start = Offset(size.width * 0.42f, size.height * 0.39f),
+            end = Offset(size.width * 0.42f, size.height * 0.73f),
+            strokeWidth = stroke,
+        )
+        drawLine(
+            color = CreateSubtext,
+            start = Offset(size.width * 0.58f, size.height * 0.39f),
+            end = Offset(size.width * 0.58f, size.height * 0.73f),
+            strokeWidth = stroke,
+        )
+    }
+}
+
+@Composable
+private fun CategoryTag(text: String) {
+    Surface(
+        color = Color.White,
+        shape = CircleShape,
+        border = androidx.compose.foundation.BorderStroke(1.dp, CreateBorder),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(Modifier.size(6.dp).background(Color(0xFFEE8A5F), CircleShape))
+            Text(text, modifier = Modifier.padding(start = 5.dp), color = CreateText, fontSize = 11.sp)
+        }
+    }
+}
+
+@Preview(showBackground = true, widthDp = 360, heightDp = 800)
+@Composable
+private fun TripInfoInputScreenPreview() {
+    MaterialTheme { TripInfoInputScreen() }
+}

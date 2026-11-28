@@ -436,13 +436,24 @@ exports.travelApi = onCall(
 
         validatePeriod(startDate, endDate);
 
+        const initialPlaces = data.places ?? [];
+        if (!Array.isArray(initialPlaces) || initialPlaces.length > MAX_PLACES) {
+          fail("invalid-argument", "여행 장소는 최대 100개까지 추가할 수 있어요.");
+        }
+        const places = initialPlaces.map((place) => {
+          if (!place || typeof place !== "object" || Array.isArray(place)) {
+            fail("invalid-argument", "장소 정보를 확인해 주세요.");
+          }
+          return { id: randomUUID(), ...normalizePlace(place), visitDate: null, visitOrder: null, visitTime: null, note: "" };
+        });
+
         trip = {
           title: text(data.title, "여행 이름", 60),
           startDate,
           endDate,
           ownerId: uid,
-          places: [],
-          placesConfirmed: false,
+          places,
+          placesConfirmed: places.length > 0,
           version: 1,
           createdAt: now,
           updatedAt: now,
